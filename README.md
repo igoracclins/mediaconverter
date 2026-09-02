@@ -2,6 +2,19 @@
 
 Aplicativo desktop para conversão em lote de arquivos de mídia (áudio, vídeo e imagem), desenvolvido com Electron, Vue 3 e TypeScript. Todo o processamento acontece localmente, na própria máquina; nenhum arquivo é enviado para a nuvem.
 
+## Download
+
+A versão mais recente do Media Converter pode ser baixada na página de Releases do GitHub.
+
+| Plataforma                  | Instalador |
+| --------------------------- | ---------- |
+| macOS Apple Silicon (arm64) | `.dmg`     |
+| Windows x64                 | `.exe`     |
+
+**[Baixar a versão mais recente](../../releases/latest)**
+
+Os instaladores são disponibilizados como assets das Releases do projeto.
+
 ## Sobre o projeto
 
 Projeto desenvolvido para fins acadêmicos. O aplicativo permite adicionar vários arquivos de mídia, escolher o formato de saída desejado (opção "Converter todos para") e processá-los em uma fila, com acompanhamento do progresso em tempo real. O formato escolhido é aplicado globalmente aos arquivos compatíveis.
