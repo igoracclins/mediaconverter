@@ -1,0 +1,91 @@
+appId: com.example.mediaconverter
+productName: Media Converter
+copyright: Copyright © 2026 Media Converter contributors
+
+directories:
+  output: dist
+  buildResources: build
+
+electronLanguages:
+  - en
+
+files:
+  - out/**
+  - package.json
+  - '!**/*.map'
+  - '!node_modules/**/.cache/**'
+  - '!node_modules/**/LICENSE'
+  - '!node_modules/**/LICENSE.md'
+  - '!node_modules/**/README'
+  - '!node_modules/**/README.md'
+
+extraResources:
+  - from: third_party/ffmpeg
+    to: licenses/ffmpeg
+    filter:
+      - COPYING.GPLv2
+      - SOURCE.txt
+
+asar: true
+asarUnpack:
+  - '**/node_modules/sharp/**'
+
+npmRebuild: false
+
+mac:
+  category: public.app-category.video
+  target:
+    - target: dmg
+      arch: [arm64]
+    - target: zip
+      arch: [arm64]
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  extraResources:
+    - from: resources/ffmpeg/darwin-arm64
+      to: ffmpeg/darwin-arm64
+    - from: third_party/ffmpeg
+      to: licenses/ffmpeg
+      filter:
+        - COPYING.GPLv2
+        - SOURCE.txt
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-win-${arch}.${ext}
+  extraResources:
+    - from: resources/ffmpeg/win32-x64
+      to: ffmpeg/win32-x64
+    - from: third_party/ffmpeg
+      to: licenses/ffmpeg
+      filter:
+        - COPYING.GPLv2
+        - SOURCE.txt
+
+linux:
+  target:
+    - AppImage
+    - deb
+  category: AudioVideo
+  maintainer: Media Converter contributors
+  extraResources:
+    - from: resources/ffmpeg/linux-x64
+      to: ffmpeg/linux-x64
+    - from: third_party/ffmpeg
+      to: licenses/ffmpeg
+      filter:
+        - COPYING.GPLv2
+        - SOURCE.txt
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  artifactName: ${productName}-${version}-win-${arch}.${ext}
+
+dmg:
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+
+publish: null
