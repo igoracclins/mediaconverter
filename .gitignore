@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+out/
+dist/
+
+# FFmpeg binaries are fetched by `pnpm ffmpeg:prepare` — never commit them.
+resources/ffmpeg/
+
+# Logs
+logs/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Local tooling caches
+.cache/
+
+# Release artifacts (if built locally instead of via CI)
+release/

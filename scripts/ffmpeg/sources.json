@@ -1,0 +1,67 @@
+{
+  "doc": "Pinned FFmpeg/ffprobe sources, one entry per target platform-arch key. GPL builds are used deliberately for consistent full audio/video codec coverage across macOS (osxexperts.net), Windows and Linux (BtbN/FFmpeg-Builds). Each archive checksum is the immutable sha256 recorded at pinning time; prepare.mjs refuses to install on mismatch. NOTE: osxexperts.net has twice updated binaries without updating its published checksum page; the hashes below are the ones we verified against the actual server payloads (ffmpeg/ffprobe 9.0 arm64, built 2026-07-07; 8.0 intel).",
+  "darwin-arm64": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "files": [
+      {
+        "url": "https://www.osxexperts.net/ffmpeg9arm.zip",
+        "sha256": "d0c06c5c68ce48af3143b262f7a9118a7c9f67de1e237fcc24ffb14df9c67af9",
+        "match": "ffmpeg"
+      },
+      {
+        "url": "https://www.osxexperts.net/ffprobe9arm.zip",
+        "sha256": "0c94fbdd8917022f28115eca512196cf4648732bc9e5db9ec8896c7e519d02aa",
+        "match": "ffprobe"
+      }
+    ]
+  },
+  "darwin-x64": {
+    "platform": "darwin",
+    "arch": "x64",
+    "files": [
+      {
+        "url": "https://www.osxexperts.net/ffmpeg80intel.zip",
+        "sha256": "2d24d22db78c87f394a5822867acd5c5dc5e762cd261a44bd26923f3a5af3e07",
+        "match": "ffmpeg"
+      },
+      {
+        "url": "https://www.osxexperts.net/ffprobe80intel.zip",
+        "sha256": "0b6576104a95c1b39d4939e2df86f8f7cf1d55287ff57da48777d94605d12feb",
+        "match": "ffprobe"
+      }
+    ]
+  },
+  "win32-x64": {
+    "platform": "win32",
+    "arch": "x64",
+    "files": [
+      {
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-N-126335-gb32f8d1c23-win64-gpl.zip",
+        "sha256": "ed59cb91788b6893bf78ac8a732cc2c1367f8e17ebcbdef61c72e4865cc3df2b",
+        "match": "ffmpeg.exe"
+      },
+      {
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-N-126335-gb32f8d1c23-win64-gpl.zip",
+        "sha256": "ed59cb91788b6893bf78ac8a732cc2c1367f8e17ebcbdef61c72e4865cc3df2b",
+        "match": "ffprobe.exe"
+      }
+    ]
+  },
+  "linux-x64": {
+    "platform": "linux",
+    "arch": "x64",
+    "files": [
+      {
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-N-126335-gb32f8d1c23-linux64-gpl.tar.xz",
+        "sha256": "fb34e514f57696521ec6858df4fed7a6cf88cb212fd98d23a4d7b6e76340ace0",
+        "match": "ffmpeg"
+      },
+      {
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-N-126335-gb32f8d1c23-linux64-gpl.tar.xz",
+        "sha256": "fb34e514f57696521ec6858df4fed7a6cf88cb212fd98d23a4d7b6e76340ace0",
+        "match": "ffprobe"
+      }
+    ]
+  }
+}

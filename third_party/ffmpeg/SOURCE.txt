@@ -1,0 +1,47 @@
+Media Converter bundles static FFmpeg/ffprobe binaries as an external
+executable. The binaries are licensed under the GNU GPL version 2 or later
+(they are configured with `--enable-gpl` and statically link GPL-licensed
+encoder libraries such as libx264 and libx265).
+
+To fulfil the source-availability obligation of the GPL for these binaries,
+their exact provenance is recorded below. The verification hashes are logged
+in scripts/ffmpeg/sources.json; at install time `pnpm ffmpeg:prepare`
+sha256-verifies each downloaded **archive** against these hashes and refuses to
+install on mismatch, so the extracted `ffmpeg`/`ffprobe` executables are shipped
+unmodified.
+
+Corresponding source:
+
+  * Upstream FFmpeg source (release matching each binary):
+      macOS arm64  - FFmpeg 9.0   https://ffmpeg.org/releases/ffmpeg-9.0.tar.xz
+      macOS x64    - FFmpeg 8.0   https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz
+      Windows x64  - BtbN autobuild ffmpeg-N-126335-gb32f8d1c23
+                     https://github.com/BtbN/FFmpeg-Builds
+      Linux x64    - BtbN autobuild ffmpeg-N-126335-gb32f8d1c23
+                     https://github.com/BtbN/FFmpeg-Builds
+  * Build recipes / third-party encoder sources are published by the binary
+    providers: https://www.osxexperts.net (macOS) and
+    https://github.com/BtbN/FFmpeg-Builds (Windows/Linux).
+
+Binary provenance and hashes:
+
+  * darwin-arm64  ffmpeg/ffprobe 9.0 (built 2026-07-07)
+      https://www.osxexperts.net/ffmpeg9arm.zip    sha256 d0c06c5c68ce48af3143b262f7a9118a7c9f67de1e237fcc24ffb14df9c67af9
+      https://www.osxexperts.net/ffprobe9arm.zip   sha256 0c94fbdd8917022f28115eca512196cf4648732bc9e5db9ec8896c7e519d02aa
+  * darwin-x64    ffmpeg/ffprobe 8.0
+      https://www.osxexperts.net/ffmpeg80intel.zip  sha256 2d24d22db78c87f394a5822867acd5c5dc5e762cd261a44bd26923f3a5af3e07
+      https://www.osxexperts.net/ffprobe80intel.zip sha256 0b6576104a95c1b39d4939e2df86f8f7cf1d55287ff57da48777d94605d12feb
+  * win32-x64     ffmpeg/ffmpeg.exe + ffprobe.exe (GPL build)
+      https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-N-126335-gb32f8d1c23-win64-gpl.zip
+      sha256 ed59cb91788b6893bf78ac8a732cc2c1367f8e17ebcbdef61c72e4865cc3df2b
+  * linux-x64     ffmpeg/ffprobe (GPL build)
+      https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-N-126335-gb32f8d1c23-linux64-gpl.tar.xz
+      sha256 fb34e514f57696521ec6858df4fed7a6cf88cb212fd98d23a4d7b6e76340ace0
+
+The exact configure line used by each binary can be inspected with
+`ffmpeg -buildconf` on the shipped executable.
+
+A written offer for the corresponding source is available on request from the
+Media Converter contributors. This file, the license text
+(COPYING.GPLv2) and this notice are distributed alongside the binaries in the
+application bundle so recipients receive them together as the GPL requires.

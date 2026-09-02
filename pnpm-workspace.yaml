@@ -1,0 +1,21 @@
+supportedArchitectures:
+  os:
+    - darwin
+    - win32
+  cpu:
+    - arm64
+    - x64
+
+allowBuilds:
+  electron: true
+  electron-winstaller: true
+  esbuild: true
+  sharp: true
+  '@img/sharp-darwin-arm64': true
+  '@img/sharp-darwin-x64': true
+  '@img/sharp-libvips-darwin-arm64': true
+  '@img/sharp-libvips-darwin-x64': true
+  '@img/sharp-linux-x64': true
+  '@img/sharp-linux-arm64': true
+  '@img/sharp-win32-x64': true
+  '@tailwindcss/oxide': true
