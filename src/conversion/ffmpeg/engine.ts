@@ -67,9 +67,11 @@ export function createFfmpegEngine(opts: FfmpegEngineOptions): ConversionEngine 
       };
 
       let durationMs: number | null = task.durationMs;
-      void probeDuration(opts.ffprobeBin, task.inputPath).then((probed) => {
-        if (probed !== null) durationMs = probed;
-      });
+      if (durationMs === null) {
+        void probeDuration(opts.ffprobeBin, task.inputPath).then((probed) => {
+          if (probed !== null) durationMs = probed;
+        });
+      }
 
       const tail = createTailBuffer(30);
       const processed = spawnTracked(opts.ffmpegBin, buildFfmpegArgs(task), {

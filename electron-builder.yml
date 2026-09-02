@@ -18,6 +18,12 @@ files:
   - '!node_modules/**/LICENSE.md'
   - '!node_modules/**/README'
   - '!node_modules/**/README.md'
+  # Sharp ships one native package per platform/arch. We build only macOS arm64
+  # and Windows x64, so keep only their native binaries and drop the rest.
+  - '!node_modules/@img/sharp-darwin-x64/**'
+  - '!node_modules/@img/sharp-libvips-darwin-x64/**'
+  - '!node_modules/@img/sharp-win32-arm64/**'
+  - '!node_modules/@img/sharp-libvips-win32-arm64/**'
 
 extraResources:
   - from: third_party/ffmpeg

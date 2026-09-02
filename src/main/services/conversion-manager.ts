@@ -249,6 +249,7 @@ export class ConversionManager {
   }> {
     const maxSizeMb = (job.compression as CompressionOptions).maxSizeMb;
     const probe = await this.probeTask(job);
+    task.durationMs = probe.durationMs;
 
     let budget = maxSizeMb;
     for (let attempt = 0; attempt < MAX_COMPRESSION_ATTEMPTS; attempt++) {
