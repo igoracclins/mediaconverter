@@ -84,6 +84,7 @@ function addDrafts(paths: string[]): void {
     } else if (added > 0) {
       banner.value = null;
     }
+    if (added > 0) scheduleEstimateSync();
   });
 }
 
@@ -100,7 +101,10 @@ function updateConfig(
   patch: Partial<Pick<CompressionDraftConfig, 'maxSizeRaw'>>,
 ): void {
   const cfg = drafts.value[index]?.compression;
-  if (cfg) Object.assign(cfg, patch);
+  if (cfg) {
+    Object.assign(cfg, patch);
+    scheduleEstimateSync();
+  }
 }
 
 function hasTerminalJobs(): boolean {
@@ -208,52 +212,52 @@ function scheduleEstimateSync(): void {
 
 async function syncEstimates(): Promise<void> {
   if (mode.value !== 'compress') return;
-  for (const draft of drafts.value) {
-    const cfg = draft.compression;
-    if (!cfg) continue;
-    const target = compressionTargetFor(draft);
-    if (!target || target.lossless) continue;
-    const raw = cfg.maxSizeRaw;
-    const key = `${raw}`;
-    if (cfg.estimating || cfg.lastSyncKey === key) continue;
-    const maxMb = parseTargetSizeMb(raw);
-    const probe = maxMb ?? 1;
-    cfg.estimating = true;
-    try {
-      const result = await window.api.estimateCompression({
-        inputPath: draft.path,
-        targetFormat: target.format,
-        maxSizeMb: probe,
-      });
-      let seeded = false;
-      if (result.ok) {
-        if (
-          maxMb === null &&
-          raw.trim() === '' &&
-          result.estimate.recommendedMinMb !== null &&
-          result.estimate.recommendedMinMb > 0
-        ) {
-          cfg.maxSizeRaw = String(Math.ceil(result.estimate.recommendedMinMb));
-          seeded = true;
+  for (let round = 0; round < 2; round++) {
+    let changed = false;
+    for (const draft of drafts.value) {
+      const cfg = draft.compression;
+      if (!cfg) continue;
+      const target = compressionTargetFor(draft);
+      if (!target || target.lossless) continue;
+      const key = `${cfg.maxSizeRaw}`;
+      if (cfg.estimating || cfg.lastSyncKey === key) continue;
+      const maxMb = parseTargetSizeMb(cfg.maxSizeRaw);
+      const probe = maxMb ?? 1;
+      cfg.estimating = true;
+      changed = true;
+      try {
+        const result = await window.api.estimateCompression({
+          inputPath: draft.path,
+          targetFormat: target.format,
+          maxSizeMb: probe,
+        });
+        let seeded = false;
+        if (result.ok) {
+          if (
+            maxMb === null &&
+            cfg.maxSizeRaw.trim() === '' &&
+            result.estimate.recommendedMinMb !== null &&
+            result.estimate.recommendedMinMb > 0
+          ) {
+            cfg.maxSizeRaw = String(Math.ceil(result.estimate.recommendedMinMb));
+            seeded = true;
+          }
+          cfg.estimate = seeded ? null : result.estimate;
+        } else {
+          cfg.estimate = null;
         }
-        cfg.estimate = seeded ? null : result.estimate;
-      } else {
-        cfg.estimate = null;
+      } finally {
+        cfg.estimating = false;
+        cfg.lastSyncKey = key;
       }
-    } finally {
-      cfg.estimating = false;
-      cfg.lastSyncKey = key;
     }
+    if (!changed) break;
   }
 }
 
-watch(
-  [mode, drafts],
-  () => {
-    if (mode.value === 'compress') scheduleEstimateSync();
-  },
-  { deep: true },
-);
+watch(mode, () => {
+  if (mode.value === 'compress') scheduleEstimateSync();
+});
 
 watch(
   jobs,

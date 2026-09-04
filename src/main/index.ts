@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { appendFileSync, mkdirSync } from 'node:fs';
-import { app, session } from 'electron';
+import { app, Menu, session } from 'electron';
 import { createEngineBundle } from '@conversion/service';
 import { currentArch, currentPlatform } from '@platform/info';
 import { logger } from './logger';
@@ -52,6 +52,11 @@ app.whenReady().then(() => {
 
   const platform = currentPlatform();
   const arch = currentArch();
+
+  if (platform === 'win32') {
+    Menu.setApplicationMenu(null);
+  }
+
   const ffmpegSuffix = platform === 'win32' ? '.exe' : '';
   const ffmpegBin = `${resourcesBaseDir}/ffmpeg/${platform}-${arch}/ffmpeg${ffmpegSuffix}`;
   const ffprobeBin = `${resourcesBaseDir}/ffmpeg/${platform}-${arch}/ffprobe${ffmpegSuffix}`;
