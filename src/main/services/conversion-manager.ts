@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { rmSync, statSync } from 'node:fs';
+import { constants as fsConstants, copyFile } from 'node:fs/promises';
 import { encodeWithinBudget, isValidCompressionOptions, bytesToMb } from '@conversion/compress';
 import type { ConversionTask, EngineBundle } from '@conversion/engine';
 import { probeMedia } from '@conversion/ffmpeg/probe';
@@ -163,7 +164,10 @@ export class ConversionManager {
     if (!detected) {
       return { ok: false, error: 'UNSUPPORTED_SOURCE' };
     }
-    const category = categoryOf(item.targetFormat);
+    const isCompression = item.compression !== undefined;
+    const category = isCompression
+      ? detected.category
+      : categoryOf(item.targetFormat);
     if (!FORMATS_BY_CATEGORY[category].some((f) => f.id === item.targetFormat)) {
       return { ok: false, error: 'INVALID_REQUEST' };
     }
@@ -305,6 +309,20 @@ export class ConversionManager {
     };
   }
 
+  private async copyToOutput(task: ConversionTask): Promise<{
+    code: AppErrorCode | null;
+    message: string | null;
+    ok: boolean;
+  }> {
+    try {
+      await copyFile(task.inputPath, task.outputPath, fsConstants.COPYFILE_EXCL);
+      return { code: null, message: null, ok: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { code: 'ENCODE_FAILED', message, ok: false };
+    }
+  }
+
   private async run(job: InternalJob): Promise<void> {
     this.running++;
     this.broadcast();
@@ -319,6 +337,8 @@ export class ConversionManager {
 
     if (started.compression) {
       result = await this.runCompression(task, started);
+    } else if (started.sourceExtension === started.targetFormat) {
+      result = await this.copyToOutput(task);
     } else {
       const handle = this.service.execute(task, (value) => {
         const current = this.queue.get(task.id);

@@ -32,14 +32,10 @@ export function parseTargetSizeMb(value: unknown): number | null {
   return n;
 }
 
-export function parseMaxSizeMb(value: unknown): number | null {
-  return parseTargetSizeMb(value);
-}
-
 export function isValidCompressionOptions(value: unknown): boolean {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
-  return parseMaxSizeMb(v.maxSizeMb) !== null && typeof v.maxSizeMb === 'number';
+  return parseTargetSizeMb(v.maxSizeMb) !== null && typeof v.maxSizeMb === 'number';
 }
 
 export type CompressionEncode =

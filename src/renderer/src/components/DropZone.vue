@@ -6,13 +6,23 @@ const dragging = ref(false);
 
 async function resolveDropped(event: DragEvent): Promise<string[]> {
   const paths: string[] = [];
+  const seen = new Set<string>();
+  const addPath = (candidate: string | null): void => {
+    if (candidate && !seen.has(candidate)) {
+      seen.add(candidate);
+      paths.push(candidate);
+    }
+  };
+
   for (const item of event.dataTransfer?.items ?? []) {
     const file = item.kind === 'file' ? item.getAsFile() : null;
-    if (file) {
-      const resolved = window.api.getPathForFile(file);
-      if (resolved) paths.push(resolved);
-    }
+    if (file) addPath(window.api.getPathForFile(file));
   }
+
+  for (const file of event.dataTransfer?.files ?? []) {
+    addPath(window.api.getPathForFile(file));
+  }
+
   return paths;
 }
 
@@ -51,7 +61,7 @@ function pickFiles(): void {
       >Arraste arquivos de mídia aqui ou clique para procurar</span
     >
     <span class="text-xs text-ink-dim"
-      >Áudio, vídeo e imagens de qualquer tamanho — convertido localmente, nada sai do seu
+      >Áudio, vídeo e imagens de qualquer tamanho, convertido localmente, nada sai do seu
       dispositivo.</span
     >
   </button>

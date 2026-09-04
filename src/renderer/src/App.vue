@@ -1,16 +1,33 @@
 <script setup lang="ts">
-import { ref, watch, computed, onBeforeUnmount } from 'vue';
+import { ref, watch, onBeforeUnmount } from 'vue';
 import DropZone from './components/DropZone.vue';
 import DraftList from './components/DraftList.vue';
 import CompressionDraftList from './components/CompressionDraftList.vue';
 import QueueList from './components/QueueList.vue';
 import { useQueue } from './composables/useQueue';
-import { TARGET_FORMAT_MAP, FORMATS_BY_CATEGORY } from '@shared/formats';
+import { TARGET_FORMAT_MAP } from '@shared/formats';
 import type { ConversionRequestItem } from '@shared/ipc';
 import { parseTargetSizeMb } from '@conversion/compress';
 import type { CompressionDraftConfig, DraftItem } from './types';
-import type { QualityPreset, TargetFormat } from '@shared/types';
+import type { MediaCategory, QualityPreset, TargetFormat } from '@shared/types';
 import { userMessage } from '@shared/errors';
+import { keepFormatFor, isLosslessFormat } from './compression-format';
+
+interface CompressionTarget {
+  format: TargetFormat;
+  label: string;
+  lossless: boolean;
+}
+
+function compressionTargetFor(item: DraftItem): CompressionTarget | null {
+  const format = keepFormatFor(item.category, item.extension);
+  if (!format) return null;
+  return {
+    format,
+    label: TARGET_FORMAT_MAP[format].label,
+    lossless: isLosslessFormat(format),
+  };
+}
 
 const { appInfo, jobs, messageFor } = useQueue();
 
@@ -18,20 +35,17 @@ const drafts = ref<DraftItem[]>([]);
 const converting = ref(false);
 const banner = ref<{ kind: 'error' | 'info'; text: string } | null>(null);
 
-const globalFormat = ref<TargetFormat>('mp3');
-const globalDescriptor = computed(() => TARGET_FORMAT_MAP[globalFormat.value]);
+const formatsByCategory = ref<Record<MediaCategory, TargetFormat>>({
+  video: 'mp4',
+  audio: 'mp3',
+  image: 'jpg',
+});
 
 const mode = ref<'convert' | 'compress'>('convert');
 
 const beforeIds = new Set<string>();
 const batchIds = new Set<string>();
 const completion = ref<{ hadIncompatible: boolean; compressed: boolean } | null>(null);
-
-const categoryLabel: Record<string, string> = {
-  audio: 'Áudio',
-  video: 'Vídeo',
-  image: 'Imagem',
-};
 
 function newCompressionConfig(): CompressionDraftConfig {
   return {
@@ -47,28 +61,6 @@ function segBtnClass(active: boolean): string {
     ? 'cursor-pointer rounded-md border border-accent bg-surface-raised px-4 py-1.5 text-sm font-medium text-ink transition-colors'
     : 'cursor-pointer rounded-md border border-edge px-4 py-1.5 text-sm text-ink-dim transition-colors hover:border-accent hover:text-ink';
 }
-
-function compatibleCount(): number {
-  const category = globalDescriptor.value.category;
-  return drafts.value.filter((d) => d.category === category).length;
-}
-
-function compressReadyCount(): number {
-  const category = globalDescriptor.value.category;
-  return drafts.value.filter(
-    (d) =>
-      d.category === category &&
-      d.compression !== undefined &&
-      parseTargetSizeMb(d.compression.maxSizeRaw) !== null,
-  ).length;
-}
-
-const actionLabel = computed(() => {
-  if (converting.value) return 'Adicionando à fila…';
-  const count = mode.value === 'compress' ? compressReadyCount() : compatibleCount();
-  const verb = mode.value === 'compress' ? 'Comprimir' : 'Converter';
-  return `${verb} ${count} ${count === 1 ? 'arquivo' : 'arquivos'}`;
-});
 
 function addDrafts(paths: string[]): void {
   void window.api.inspectFiles(paths).then((result) => {
@@ -123,40 +115,63 @@ function cancelJob(jobId: string): void {
   void window.api.cancelJob(jobId);
 }
 
-async function convertAll(): Promise<void> {
-  if (drafts.value.length === 0 || converting.value) return;
+function setCategoryFormat(category: MediaCategory, format: TargetFormat): void {
+  formatsByCategory.value[category] = format;
+}
 
-  const isCompress = mode.value === 'compress';
+async function convertCategory(category: MediaCategory): Promise<void> {
+  if (converting.value) return;
+  const categoryDrafts = drafts.value.filter((d) => d.category === category);
+  if (categoryDrafts.length === 0) return;
+
   converting.value = true;
   banner.value = null;
-  const category = globalDescriptor.value.category;
-  const compatible: DraftItem[] = [];
-  const incompatible: DraftItem[] = [];
-  for (const d of drafts.value) {
-    if (d.category === category) compatible.push(d);
-    else incompatible.push(d);
+  const format = formatsByCategory.value[category];
+  const items: ConversionRequestItem[] = categoryDrafts.map((d) => ({
+    inputPath: d.path,
+    targetFormat: format,
+    quality: 'high' as QualityPreset,
+  }));
+  const submitted = new Set(items.map((item) => item.inputPath));
+  for (const job of jobs.value) beforeIds.add(job.id);
+  try {
+    const result = await window.api.startConversion({
+      items,
+      destination: null,
+    });
+    if (result.ok) {
+      completion.value = { hadIncompatible: false, compressed: false };
+      drafts.value = drafts.value.filter((d) => !submitted.has(d.path));
+    } else {
+      banner.value = { kind: 'error', text: userMessage(result.error) };
+    }
+  } finally {
+    converting.value = false;
   }
-  const items: ConversionRequestItem[] = compatible
-    .map((d): ConversionRequestItem | null => {
-      if (!isCompress) {
-        return {
-          inputPath: d.path,
-          targetFormat: globalFormat.value,
-          quality: 'high' as QualityPreset,
-        };
-      }
-      const cfg = d.compression;
-      if (!cfg) return null;
-      const maxSizeMb = parseTargetSizeMb(cfg.maxSizeRaw);
-      if (maxSizeMb === null) return null;
-      return {
-        inputPath: d.path,
-        targetFormat: globalFormat.value,
-        quality: 'high' as QualityPreset,
-        compression: { maxSizeMb },
-      };
-    })
-    .filter((item): item is ConversionRequestItem => item !== null);
+}
+
+async function compressCategory(category: MediaCategory): Promise<void> {
+  if (converting.value) return;
+  const categoryDrafts = drafts.value.filter((d) => d.category === category);
+  if (categoryDrafts.length === 0) return;
+
+  converting.value = true;
+  banner.value = null;
+  const items: ConversionRequestItem[] = [];
+  for (const d of categoryDrafts) {
+    const cfg = d.compression;
+    if (!cfg) continue;
+    const target = compressionTargetFor(d);
+    if (!target || target.lossless) continue;
+    const maxSizeMb = parseTargetSizeMb(cfg.maxSizeRaw);
+    if (maxSizeMb === null) continue;
+    items.push({
+      inputPath: d.path,
+      targetFormat: target.format,
+      quality: 'high' as QualityPreset,
+      compression: { maxSizeMb },
+    });
+  }
   const submitted = new Set(items.map((item) => item.inputPath));
   for (const job of jobs.value) beforeIds.add(job.id);
   try {
@@ -166,20 +181,14 @@ async function convertAll(): Promise<void> {
             items,
             destination: null,
           })
-        : { ok: true as const, created: 0, rejected: [] as { inputPath: string; error: string }[] };
+        : {
+            ok: true as const,
+            created: 0,
+            rejected: [] as { inputPath: string; error: string }[],
+          };
     if (result.ok) {
-      completion.value = {
-        hadIncompatible: incompatible.length > 0,
-        compressed: isCompress,
-      };
-      drafts.value = isCompress ? drafts.value.filter((d) => !submitted.has(d.path)) : [];
-      if (incompatible.length > 0) {
-        const verb = isCompress ? 'comprimido' : 'convertido';
-        banner.value = {
-          kind: 'error',
-          text: `${incompatible.length} ${incompatible.length === 1 ? 'arquivo não pôde' : 'arquivos não puderam'} ser ${verb}${incompatible.length === 1 ? '' : 's'} para ${globalDescriptor.value.label}.`,
-        };
-      }
+      completion.value = { hadIncompatible: false, compressed: true };
+      drafts.value = drafts.value.filter((d) => !submitted.has(d.path));
     } else {
       banner.value = { kind: 'error', text: userMessage(result.error) };
     }
@@ -199,11 +208,11 @@ function scheduleEstimateSync(): void {
 
 async function syncEstimates(): Promise<void> {
   if (mode.value !== 'compress') return;
-  const category = globalDescriptor.value.category;
-  const format = globalFormat.value;
   for (const draft of drafts.value) {
     const cfg = draft.compression;
-    if (!cfg || draft.category !== category) continue;
+    if (!cfg) continue;
+    const target = compressionTargetFor(draft);
+    if (!target || target.lossless) continue;
     const raw = cfg.maxSizeRaw;
     const key = `${raw}`;
     if (cfg.estimating || cfg.lastSyncKey === key) continue;
@@ -213,7 +222,7 @@ async function syncEstimates(): Promise<void> {
     try {
       const result = await window.api.estimateCompression({
         inputPath: draft.path,
-        targetFormat: format,
+        targetFormat: target.format,
         maxSizeMb: probe,
       });
       let seeded = false;
@@ -239,7 +248,7 @@ async function syncEstimates(): Promise<void> {
 }
 
 watch(
-  [mode, globalFormat, drafts],
+  [mode, drafts],
   () => {
     if (mode.value === 'compress') scheduleEstimateSync();
   },
@@ -295,7 +304,7 @@ onBeforeUnmount(() => {
       <div>
         <h1 class="text-lg font-semibold text-ink">Media Converter</h1>
         <p v-if="appInfo" class="text-xs text-ink-dim">
-          v{{ appInfo.appVersion }} · {{ appInfo.platform }} {{ appInfo.arch }}
+          v{{ appInfo.appVersion }} {{ appInfo.platform }} {{ appInfo.arch }}
         </p>
       </div>
     </header>
@@ -335,60 +344,11 @@ onBeforeUnmount(() => {
             </button>
           </div>
 
-          <div v-if="mode === 'convert'" class="flex flex-wrap items-center gap-3">
-            <div class="flex min-w-0 items-center gap-2">
-              <label for="global-format" class="shrink-0 text-sm text-ink-dim">
-                Converter todos para:
-              </label>
-              <select
-                id="global-format"
-                class="shrink-0 cursor-pointer rounded-md border border-edge bg-surface-raised px-2 py-1 text-sm text-ink outline-none transition-colors hover:border-accent focus:border-accent"
-                :value="globalFormat"
-                @change="globalFormat = ($event.target as HTMLSelectElement).value as TargetFormat"
-              >
-                <optgroup
-                  v-for="category in Object.keys(FORMATS_BY_CATEGORY) as Array<
-                    'audio' | 'video' | 'image'
-                  >"
-                  :key="category"
-                  :label="categoryLabel[category]"
-                >
-                  <option
-                    v-for="format in FORMATS_BY_CATEGORY[category]"
-                    :key="format.id"
-                    :value="format.id"
-                  >
-                    {{ format.label }}
-                  </option>
-                </optgroup>
-              </select>
-            </div>
-
-            <button
-              type="button"
-              :disabled="converting || compatibleCount() === 0"
-              class="shrink-0 cursor-pointer rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-surface transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-              @click="convertAll"
-            >
-              {{ actionLabel }}
-            </button>
-          </div>
-
-          <div v-else class="flex flex-col gap-2">
+          <div v-if="mode === 'compress'" class="flex flex-col gap-2">
             <p class="text-xs text-ink-dim">
               Cada arquivo tem a própria configuração de compressão. Defina o tamanho máximo de cada
               arquivo na lista abaixo.
             </p>
-            <div class="flex justify-end">
-              <button
-                type="button"
-                :disabled="converting || compressReadyCount() === 0"
-                class="shrink-0 cursor-pointer rounded-md bg-accent px-4 py-1.5 text-sm font-medium text-surface transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-                @click="convertAll"
-              >
-                {{ actionLabel }}
-              </button>
-            </div>
           </div>
         </div>
 
@@ -406,16 +366,20 @@ onBeforeUnmount(() => {
       <DraftList
         v-if="drafts.length > 0 && mode === 'convert'"
         :items="drafts"
-        :global-format="globalFormat"
+        :formats="formatsByCategory"
+        :converting="converting"
         @remove="removeDraft"
+        @set-format="setCategoryFormat"
+        @convert="convertCategory"
       />
 
       <CompressionDraftList
         v-else-if="drafts.length > 0 && mode === 'compress'"
         :items="drafts"
-        :global-format="globalFormat"
+        :converting="converting"
         @remove="removeDraft"
         @update-config="updateConfig"
+        @compress="compressCategory"
       />
 
       <QueueList

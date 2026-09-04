@@ -122,8 +122,8 @@ describe('App mode tabs', () => {
     await addDraft(wrapper);
 
     expect(wrapper.text()).toContain('Converter todos para');
-    expect(wrapper.find('#global-format').exists()).toBe(true);
-    expect(wrapper.text()).toContain('Converter 1 arquivo');
+    expect(wrapper.find('#convert-format-audio').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Converter 1 áudio');
 
     expect(wrapper.text()).not.toContain('Perfil');
     expect(wrapper.text()).not.toContain('Tamanho máximo');
@@ -167,7 +167,7 @@ describe('App mode tabs', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('Converter todos para');
-    expect(wrapper.find('#global-format').exists()).toBe(true);
+    expect(wrapper.find('#convert-format-audio').exists()).toBe(true);
     expect(wrapper.text()).not.toContain('Tamanho máximo');
 
     wrapper.unmount();
@@ -268,10 +268,10 @@ describe('Compressão individual por arquivo', () => {
     await addDraft(wrapper, DRAFT_A);
     await addDraft(wrapper, DRAFT_B);
 
-    expect((wrapper.find('#global-format').element as HTMLSelectElement).value).toBe('mp3');
-    expect(wrapper.text()).toContain('Converter 2 arquivos');
+    expect((wrapper.find('#convert-format-audio').element as HTMLSelectElement).value).toBe('mp3');
+    expect(wrapper.text()).toContain('Converter 2 áudios');
 
-    await tabButton(wrapper)('Converter 2 arquivos').trigger('click');
+    await tabButton(wrapper)('Converter 2 áudios').trigger('click');
     await flushPromises();
 
     const calls = apiMock.startConversion.mock.calls;

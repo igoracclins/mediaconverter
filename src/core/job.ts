@@ -45,18 +45,6 @@ export const VALID_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
   cancelled: [],
 };
 
-export const TERMINAL_STATUSES: readonly JobStatus[] = ['completed', 'failed', 'cancelled'];
-
-export function isTerminalStatus(status: JobStatus): boolean {
-  return status === 'completed' || status === 'failed' || status === 'cancelled';
-}
-
-export function isIdleStatus(status: JobStatus): boolean {
-  return (
-    status === 'pending' || status === 'failed' || status === 'cancelled' || status === 'completed'
-  );
-}
-
 export function createJob(input: CreateJobInput, now: number = Date.now()): InternalJob {
   return {
     id: input.id,
@@ -119,16 +107,6 @@ export function setProgress(job: InternalJob, progress: number | null): Internal
   if (job.status !== 'processing') return job;
   const clamped = progress === null ? null : Math.min(100, Math.max(0, Math.round(progress)));
   return { ...job, progress: clamped };
-}
-
-export function updateTarget(
-  job: InternalJob,
-  patch: { targetFormat?: TargetFormat; quality?: QualityPreset },
-): InternalJob {
-  if (job.status !== 'pending') {
-    throw new Error(`Cannot edit job ${job.id} in state "${job.status}"`);
-  }
-  return { ...job, ...patch };
 }
 
 export function snapshot(job: InternalJob): JobSnapshot {

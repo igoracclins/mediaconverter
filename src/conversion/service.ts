@@ -39,8 +39,4 @@ export class ConversionService {
     }
     return engine.convert(task, onProgress);
   }
-
-  asPromise(task: ConversionTask, onProgress: ProgressReporter): Promise<EngineRunResult> {
-    return this.execute(task, onProgress).finished;
-  }
 }

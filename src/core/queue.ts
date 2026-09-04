@@ -23,10 +23,6 @@ export class JobQueue {
     return job;
   }
 
-  isEmpty(): boolean {
-    return this.items.length === 0;
-  }
-
   get(id: string): InternalJob | undefined {
     return this.byId.get(id);
   }
@@ -65,10 +61,6 @@ export class JobQueue {
     return this.items.find((job) => job.status === 'pending') ?? null;
   }
 
-  hasPending(): boolean {
-    return this.items.some((job) => job.status === 'pending');
-  }
-
   requestCancel(id: string): CancelResult {
     const job = this.byId.get(id);
     if (!job) return { status: 'missing' };
@@ -80,10 +72,6 @@ export class JobQueue {
     }
     if (job.status === 'processing') return { status: 'processing' };
     return { status: 'terminal' };
-  }
-
-  workingCount(): number {
-    return this.items.filter((job) => job.status === 'processing').length;
   }
 
   countByStatus(): Record<JobStatus, number> {
@@ -104,10 +92,5 @@ export class JobQueue {
       running,
       activeCount,
     };
-  }
-
-  reset(): void {
-    this.items = [];
-    this.byId.clear();
   }
 }
