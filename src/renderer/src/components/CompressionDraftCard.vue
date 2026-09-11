@@ -46,7 +46,7 @@ const view = computed(() => {
         text: `O tamanho máximo não pode ser maior que o tamanho original do arquivo (${formatMb(limitMb)}).`,
       };
     } else {
-      hint = compressionHint(cfg.estimate, label ?? '');
+      hint = compressionHint(cfg.estimate, label ?? '', props.item.sizeBytes, parsed);
     }
   }
   return { label, sizeText, compressible, maxSizeRaw, hint, limitMb };

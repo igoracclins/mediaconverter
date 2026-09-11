@@ -334,7 +334,7 @@ describe('Compressão individual por arquivo', () => {
     wrapper.unmount();
   });
 
-  it('clamps the seeded value to the original size for small files', async () => {
+  it('never seeds above the original file size for small files', async () => {
     const wrapper = mount(App);
     await flushPromises();
     const draft: AddFilesResult = {

@@ -25,6 +25,13 @@ describe('resolveAndReserveOutput', () => {
     }
   });
 
+  it('uses a Comprimidos folder when resolving a compression output', () => {
+    const input = path.join(dir, 'audio.ogg');
+    const result = resolveAndReserveOutput(input, 'mp3', null, 'Comprimidos');
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.outputPath).toBe(path.join(dir, 'Comprimidos', 'audio.mp3'));
+  });
+
   it('resolves a fresh name when the destination already exists (collision)', () => {
     const input = path.join(dir, 'audio.ogg');
     const convDir = path.join(dir, 'Convertidos');

@@ -7,6 +7,7 @@ const WINDOWS_RESERVED_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i;
 export const DEFAULT_MAX_ATTEMPTS = 10_000;
 
 export const CONVERTED_DIR = 'Convertidos';
+export const COMPRESSED_DIR = 'Comprimidos';
 
 export function sanitizeBaseName(base: string): string {
   let cleaned = base.replace(WINDOWS_RESERVED, '').trim();
@@ -47,12 +48,13 @@ export function resolveOutputPath(
   inputPath: string,
   targetExt: string,
   destDir: string | null,
+  defaultDir = CONVERTED_DIR,
 ): string {
   const normalizedInput = inputPath.replace(/\\/g, '/');
   const slash = normalizedInput.lastIndexOf('/');
   const base = slash >= 0 ? normalizedInput.slice(0, slash + 1) : '';
   const name = slash >= 0 ? normalizedInput.slice(slash + 1) : normalizedInput;
-  const dir = destDir ? normalizeDirectory(destDir) : `${base.replace(/\/$/, '')}/${CONVERTED_DIR}`;
+  const dir = destDir ? normalizeDirectory(destDir) : `${base.replace(/\/$/, '')}/${defaultDir}`;
   const fileName = targetFileName(name, targetExt);
   return `${dir}/${fileName}`;
 }

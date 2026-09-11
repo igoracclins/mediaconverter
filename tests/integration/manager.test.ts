@@ -139,7 +139,7 @@ describe.skipIf(!ffmpegReady)('ConversionManager (real pipeline)', () => {
     const job = final.jobs[0]!;
     expect(job.status).toBe('completed');
     expect(job.compression?.maxSizeMb).toBe(0.2);
-    expect(job.outputPath!).toContain('Convertidos');
+    expect(job.outputPath!).toContain('Comprimidos');
     expect(existsSync(job.outputPath!)).toBe(true);
 
     const inSize = statSync(input).size;

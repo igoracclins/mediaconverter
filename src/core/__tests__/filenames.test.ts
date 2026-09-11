@@ -60,6 +60,12 @@ describe('resolveOutputPath', () => {
     );
   });
 
+  it('uses a Comprimidos folder for compressions when dest is null', () => {
+    expect(resolveOutputPath('/mnt/media/audio.ogg', 'mp3', null, 'Comprimidos')).toBe(
+      '/mnt/media/Comprimidos/audio.mp3',
+    );
+  });
+
   it('uses the given destination directory', () => {
     expect(resolveOutputPath('/mnt/media/audio.ogg', 'mp3', '/out')).toBe('/out/audio.mp3');
   });

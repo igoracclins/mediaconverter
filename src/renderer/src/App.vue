@@ -240,6 +240,7 @@ async function syncEstimates(): Promise<void> {
               sizeBytes: draft.sizeBytes,
               recommendedMinMb: result.estimate.recommendedMinMb,
               hardMinMb: result.estimate.hardMinMb,
+              category: draft.category,
             });
             if (seededMb !== null) {
               cfg.maxSizeRaw = String(seededMb);
@@ -293,7 +294,7 @@ watch(
       banner.value = {
         kind: 'info',
         text: compressed
-          ? 'Arquivos comprimidos com sucesso. Os arquivos estão na pasta Convertidos, junto aos arquivos originais.'
+          ? 'Arquivos comprimidos com sucesso. Os arquivos estão na pasta Comprimidos, junto aos arquivos originais.'
           : 'Arquivos convertidos com sucesso. Os arquivos estão na pasta Convertidos, junto aos arquivos originais.',
       };
     }

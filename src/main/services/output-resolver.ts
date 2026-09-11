@@ -1,6 +1,6 @@
 import { readdirSync, existsSync, statSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { nextAvailableName, resolveOutputPath } from '@core/filenames';
+import { nextAvailableName, resolveOutputPath, CONVERTED_DIR } from '@core/filenames';
 import type { AppErrorCode } from '@shared/types';
 
 export type DestinationResult =
@@ -10,8 +10,9 @@ export function resolveAndReserveOutput(
   inputPath: string,
   targetFormat: string,
   destDir: string | null,
+  defaultDir = CONVERTED_DIR,
 ): DestinationResult {
-  const basePath = resolveOutputPath(inputPath, targetFormat, destDir);
+  const basePath = resolveOutputPath(inputPath, targetFormat, destDir, defaultDir);
   const slash = basePath.lastIndexOf('/');
   const dir = slash > 0 ? basePath.slice(0, slash) : '/';
   const plainName = slash >= 0 ? basePath.slice(slash + 1) : basePath;

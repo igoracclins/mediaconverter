@@ -11,6 +11,7 @@ import type { ConversionTask, EngineBundle } from '@conversion/engine';
 import { probeMedia } from '@conversion/ffmpeg/probe';
 import { ConversionService } from '@conversion/service';
 import { detectPath } from '@core/detect';
+import { COMPRESSED_DIR, CONVERTED_DIR } from '@core/filenames';
 import type { InternalJob } from '@core/job';
 import { complete, fail, setProgress, start, cancel } from '@core/job';
 import { JobQueue } from '@core/queue';
@@ -27,6 +28,7 @@ import { resolveAndReserveOutput, validateInput } from './output-resolver';
 
 const MAX_COMPRESSION_ATTEMPTS = 6;
 const RETRY_BUDGET_RATIO = 0.82;
+const RETRY_SAFETY_RATIO = 0.9;
 
 export interface StartResult {
   created: number;
@@ -196,7 +198,13 @@ export class ConversionManager {
     if (!inputValid.ok) return { ok: false, error: inputValid.error };
 
     const name = inputFileName(item.inputPath);
-    const reserved = resolveAndReserveOutput(item.inputPath, item.targetFormat, destination);
+    const outputsDir = isCompression ? COMPRESSED_DIR : CONVERTED_DIR;
+    const reserved = resolveAndReserveOutput(
+      item.inputPath,
+      item.targetFormat,
+      destination,
+      outputsDir,
+    );
     if (!reserved.ok) return { ok: false, error: reserved.error };
 
     const job = this.queue.add({
@@ -278,7 +286,13 @@ export class ConversionManager {
     );
     let budget = maxSizeMb;
     for (let attempt = 0; attempt < MAX_COMPRESSION_ATTEMPTS; attempt++) {
-      if (attempt > 0) budget = budget * RETRY_BUDGET_RATIO;
+      if (attempt > 0) {
+        try {
+          rmSync(task.outputPath, { force: true });
+        } catch {
+          void 0;
+        }
+      }
       task.compression = this.compressionPlan(job, probe, budget);
 
       const handle = this.service.execute(task, (value) => {
@@ -310,6 +324,7 @@ export class ConversionManager {
       if (sizeMb !== null && sizeMb <= maxSizeMb) {
         return { ok: true, cancelled: false, code: null, message: null };
       }
+      budget = this.nextCompressionBudget(budget, maxSizeMb, sizeMb);
     }
 
     logger.warn(
@@ -328,6 +343,18 @@ export class ConversionManager {
       message:
         'O tamanho máximo informado é muito baixo para produzir um arquivo com qualidade aceitável. Aumente o limite.',
     };
+  }
+
+  private nextCompressionBudget(
+    budget: number,
+    maxSizeMb: number,
+    sizeMb: number | null,
+  ): number {
+    if (sizeMb === null || !Number.isFinite(sizeMb) || sizeMb <= 0) {
+      return budget * RETRY_BUDGET_RATIO;
+    }
+    const ratio = maxSizeMb / sizeMb;
+    return budget * ratio * RETRY_SAFETY_RATIO;
   }
 
   private async copyToOutput(task: ConversionTask): Promise<{
