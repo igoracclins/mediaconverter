@@ -89,6 +89,7 @@ linux:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  runAfterFinish: false
   artifactName: ${productName}-${version}-win-${arch}.${ext}
 
 dmg:

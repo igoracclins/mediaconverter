@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { TARGET_FORMAT_MAP } from '@shared/formats';
 import type { DraftItem } from '../types';
-import { compressionHint, formatMb, parseMaxMb, type HintKind } from '../compression-ui';
+import { compressionHint, formatMb, originalSizeMb, parseMaxMb, type HintKind } from '../compression-ui';
 import { keepFormatFor, isLosslessFormat } from '../compression-format';
 
 const props = defineProps<{ item: DraftItem; index: number }>();
@@ -21,8 +21,10 @@ const view = computed(() => {
   const estimate = cfg?.estimate;
   const sizeText = estimate && estimate.currentSizeMb > 0 ? formatMb(estimate.currentSizeMb) : null;
   const maxSizeRaw = cfg?.maxSizeRaw ?? '';
+  const limitMb = cfg ? originalSizeMb(item.sizeBytes) : null;
   let hint: { kind: HintKind; text: string } | null = null;
   if (cfg) {
+    const parsed = parseMaxMb(maxSizeRaw);
     if (lossless) {
       hint = {
         kind: 'warning',
@@ -33,16 +35,21 @@ const view = computed(() => {
         kind: 'warning',
         text: 'Não é possível comprimir este arquivo mantendo o formato original.',
       };
-    } else if (parseMaxMb(maxSizeRaw) === null) {
+    } else if (parsed === null) {
       hint =
         maxSizeRaw.trim() === ''
           ? { kind: 'info', text: 'Defina um tamanho máximo (em MB) para este arquivo.' }
           : { kind: 'error', text: 'Informe um tamanho máximo maior que zero (em MB).' };
+    } else if (limitMb !== null && parsed > limitMb) {
+      hint = {
+        kind: 'error',
+        text: `O tamanho máximo não pode ser maior que o tamanho original do arquivo (${formatMb(limitMb)}).`,
+      };
     } else {
       hint = compressionHint(cfg.estimate, label ?? '');
     }
   }
-  return { label, sizeText, compressible, maxSizeRaw, hint };
+  return { label, sizeText, compressible, maxSizeRaw, hint, limitMb };
 });
 
 function onTarget(event: Event): void {
@@ -98,9 +105,10 @@ function hintClass(kind: HintKind): string {
           <span class="flex items-center gap-2">
             <input
               :value="view.maxSizeRaw"
-              type="number"
-              min="0.5"
-              step="0.5"
+              type="text"
+              :min="0.01"
+              :step="0.1"
+              :max="view.limitMb ?? undefined"
               inputmode="decimal"
               class="w-24 rounded-md border border-edge bg-surface-raised px-2 py-1 text-sm text-ink outline-none transition-colors hover:border-accent focus:border-accent"
               @input="onTarget"

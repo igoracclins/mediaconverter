@@ -4,6 +4,7 @@ import {
   bitsToKbps,
   bitsToMb,
   bytesToMb,
+  clampSizeMbToFile,
   evaluateCompression,
   isValidCompressionOptions,
   mbToBits,
@@ -36,6 +37,13 @@ describe('size conversion helpers', () => {
   it('converts bytes to MB', () => {
     expect(bytesToMb(1048576)).toBe(1);
     expect(bytesToMb(5242880)).toBe(5);
+  });
+
+  it('clamps the max size to the original file size', () => {
+    expect(clampSizeMbToFile(100, 50 * 1048576)).toBe(50);
+    expect(clampSizeMbToFile(30, 50 * 1048576)).toBe(30);
+    expect(clampSizeMbToFile(30, 0)).toBe(30);
+    expect(clampSizeMbToFile(30, -1)).toBe(30);
   });
 
   it('parses user-provided sizes, rejecting invalid values', () => {

@@ -12,15 +12,15 @@ const statusStyles: Record<string, string> = {
   cancelled: 'bg-surface-raised text-ink-dim',
 };
 
-function label(status: string): string {
+function label(job: JobSnapshot): string {
   const labels: Record<string, string> = {
     pending: 'Pendente',
-    processing: 'Convertendo…',
+    processing: job.compression ? 'Comprimindo…' : 'Convertendo…',
     completed: 'Concluído',
     failed: 'Falhou',
     cancelled: 'Cancelado',
   };
-  return labels[status] ?? status;
+  return labels[job.status] ?? job.status;
 }
 </script>
 
@@ -56,7 +56,7 @@ function label(status: string): string {
           class="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide"
           :class="statusStyles[job.status] ?? 'bg-surface-raised text-ink-dim'"
         >
-          {{ label(job.status) }}
+          {{ label(job) }}
         </span>
 
         <span class="hidden shrink-0 text-[11px] text-ink-dim md:inline">{{

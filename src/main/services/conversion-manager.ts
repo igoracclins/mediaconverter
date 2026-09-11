@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { rmSync, statSync } from 'node:fs';
 import { constants as fsConstants, copyFile } from 'node:fs/promises';
-import { encodeWithinBudget, isValidCompressionOptions, bytesToMb } from '@conversion/compress';
+import {
+  clampSizeMbToFile,
+  encodeWithinBudget,
+  isValidCompressionOptions,
+  bytesToMb,
+} from '@conversion/compress';
 import type { ConversionTask, EngineBundle } from '@conversion/engine';
 import { probeMedia } from '@conversion/ffmpeg/probe';
 import { ConversionService } from '@conversion/service';
@@ -59,6 +64,19 @@ function fileSizeMb(inputPath: string): number | null {
   } catch {
     return null;
   }
+}
+
+function limitedCompression(
+  item: ConversionRequestItem,
+): CompressionOptions | undefined {
+  if (item.compression === undefined) return undefined;
+  let sizeBytes = 0;
+  try {
+    sizeBytes = statSync(item.inputPath).size;
+  } catch {
+    sizeBytes = 0;
+  }
+  return { maxSizeMb: clampSizeMbToFile(item.compression.maxSizeMb, sizeBytes) };
 }
 
 function inputFileName(inputPath: string): string {
@@ -189,7 +207,7 @@ export class ConversionManager {
       targetFormat: item.targetFormat,
       quality: item.quality,
       inputPath: item.inputPath,
-      compression: item.compression,
+      compression: limitedCompression(item),
     });
     job.outputPath = reserved.outputPath;
     logger.debug('manager', `enqueued ${name} -> ${reserved.outputPath}`);
@@ -251,10 +269,13 @@ export class ConversionManager {
     code: AppErrorCode | null;
     message: string | null;
   }> {
-    const maxSizeMb = (job.compression as CompressionOptions).maxSizeMb;
     const probe = await this.probeTask(job);
     task.durationMs = probe.durationMs;
 
+    const maxSizeMb = clampSizeMbToFile(
+      (job.compression as CompressionOptions).maxSizeMb,
+      probe.sizeBytes,
+    );
     let budget = maxSizeMb;
     for (let attempt = 0; attempt < MAX_COMPRESSION_ATTEMPTS; attempt++) {
       if (attempt > 0) budget = budget * RETRY_BUDGET_RATIO;

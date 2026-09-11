@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { appendFileSync, mkdirSync } from 'node:fs';
-import { app, Menu, session } from 'electron';
+import { app, crashReporter, Menu, session } from 'electron';
 import { createEngineBundle } from '@conversion/service';
 import { currentArch, currentPlatform } from '@platform/info';
 import { logger } from './logger';
@@ -45,6 +45,16 @@ function setupLogging(): void {
 
 let manager: ConversionManager | null = null;
 
+app.disableHardwareAcceleration();
+
+crashReporter.start({
+  companyName: 'Media Converter',
+  productName: 'Media Converter',
+  submitURL: 'https://example.invalid',
+  uploadToServer: false,
+  compress: false,
+});
+
 app.whenReady().then(() => {
   setupLogging();
   setupCsp();
@@ -70,9 +80,44 @@ app.whenReady().then(() => {
     `starting ${app.getName()} v${app.getVersion()} on ${platform}-${arch} (packaged=${app.isPackaged})`,
   );
   logger.info('main', `ffmpeg binary: ${resourcesBaseDir}/ffmpeg/${platform}-${arch}`);
+  logger.info('main', `crash dumps: ${app.getPath('crashDumps')}`);
 
   manager = new ConversionManager({ bundle, ffprobeBin });
   const win = createMainWindow();
+
+  app.on('child-process-gone', (_event, details) => {
+    logger.error(
+      'main',
+      `child process exited unexpectedly type=${details.type} name=${details.name} reason=${details.reason} exitCode=${details.exitCode}`,
+    );
+  });
+
+  let rendererCrashCount = 0;
+  let rendererCrashWindowStart = 0;
+  win.webContents.on('render-process-gone', (_event, details) => {
+    if (details.reason === 'clean-exit' || details.reason === 'killed') return;
+    const now = Date.now();
+    if (now - rendererCrashWindowStart > 60_000) {
+      rendererCrashWindowStart = now;
+      rendererCrashCount = 0;
+    }
+    rendererCrashCount += 1;
+    if (rendererCrashCount > 3) {
+      logger.error(
+        'main',
+        `renderer crashed repeatedly (${rendererCrashCount} times in a row): reason=${details.reason} exitCode=${details.exitCode}; no more auto-recovery`,
+      );
+      return;
+    }
+    logger.error(
+      'main',
+      `renderer crashed: reason=${details.reason} exitCode=${details.exitCode}; reloading in 1s (attempt ${rendererCrashCount})`,
+    );
+    setTimeout(() => {
+      if (win.isDestroyed()) return;
+      void win.webContents.reload();
+    }, 1000);
+  });
 
   registerIpc({
     manager,

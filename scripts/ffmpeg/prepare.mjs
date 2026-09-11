@@ -116,6 +116,7 @@ async function installEntry(key, entry) {
 
   try {
     rmSync(workDir, { recursive: true, force: true });
+    mkdirSync(workDir, { recursive: true });
 
     if (!existsSync(archiveStamp) || hasFlag('--force')) {
       console.log(`  dl  ${entry.url}`);

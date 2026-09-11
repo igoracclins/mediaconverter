@@ -8,6 +8,7 @@ import { useQueue } from './composables/useQueue';
 import { TARGET_FORMAT_MAP } from '@shared/formats';
 import type { ConversionRequestItem } from '@shared/ipc';
 import { parseTargetSizeMb } from '@conversion/compress';
+import { initialSizeMb, maxSizeWithinLimit } from './compression-ui';
 import type { CompressionDraftConfig, DraftItem } from './types';
 import type { MediaCategory, QualityPreset, TargetFormat } from '@shared/types';
 import { userMessage } from '@shared/errors';
@@ -169,6 +170,7 @@ async function compressCategory(category: MediaCategory): Promise<void> {
     if (!target || target.lossless) continue;
     const maxSizeMb = parseTargetSizeMb(cfg.maxSizeRaw);
     if (maxSizeMb === null) continue;
+    if (!maxSizeWithinLimit(cfg.maxSizeRaw, d.sizeBytes)) continue;
     items.push({
       inputPath: d.path,
       targetFormat: target.format,
@@ -233,14 +235,16 @@ async function syncEstimates(): Promise<void> {
         });
         let seeded = false;
         if (result.ok) {
-          if (
-            maxMb === null &&
-            cfg.maxSizeRaw.trim() === '' &&
-            result.estimate.recommendedMinMb !== null &&
-            result.estimate.recommendedMinMb > 0
-          ) {
-            cfg.maxSizeRaw = String(Math.ceil(result.estimate.recommendedMinMb));
-            seeded = true;
+          if (maxMb === null && cfg.maxSizeRaw.trim() === '') {
+            const seededMb = initialSizeMb({
+              sizeBytes: draft.sizeBytes,
+              recommendedMinMb: result.estimate.recommendedMinMb,
+              hardMinMb: result.estimate.hardMinMb,
+            });
+            if (seededMb !== null) {
+              cfg.maxSizeRaw = String(seededMb);
+              seeded = true;
+            }
           }
           cfg.estimate = seeded ? null : result.estimate;
         } else {
@@ -296,6 +300,8 @@ watch(
   },
   { deep: true },
 );
+
+scheduleEstimateSync();
 
 onBeforeUnmount(() => {
   if (estimateTimer) clearTimeout(estimateTimer);

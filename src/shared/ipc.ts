@@ -12,6 +12,7 @@ export interface FileDescriptor {
   name: string;
   extension: string;
   category: MediaCategory;
+  sizeBytes: number;
 }
 
 export interface CompressionOptions {

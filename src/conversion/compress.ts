@@ -38,6 +38,11 @@ export function isValidCompressionOptions(value: unknown): boolean {
   return parseTargetSizeMb(v.maxSizeMb) !== null && typeof v.maxSizeMb === 'number';
 }
 
+export function clampSizeMbToFile(maxSizeMb: number, sizeBytes: number): number {
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return maxSizeMb;
+  return Math.min(maxSizeMb, bytesToMb(sizeBytes));
+}
+
 export type CompressionEncode =
   | { kind: 'audio'; audioBitrateBps: number }
   | { kind: 'audio-vorbis'; quality: number }

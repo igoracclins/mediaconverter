@@ -53,9 +53,27 @@ const apiMock = {
 
 const MIXED: AddFilesResult = {
   files: [
-    { path: '/m/video.mp4', name: 'video.mp4', extension: 'mp4', category: 'video' },
-    { path: '/m/musica.mp3', name: 'musica.mp3', extension: 'mp3', category: 'audio' },
-    { path: '/m/foto.jpg', name: 'foto.jpg', extension: 'jpg', category: 'image' },
+    {
+      path: '/m/video.mp4',
+      name: 'video.mp4',
+      extension: 'mp4',
+      category: 'video',
+      sizeBytes: 52428800,
+    },
+    {
+      path: '/m/musica.mp3',
+      name: 'musica.mp3',
+      extension: 'mp3',
+      category: 'audio',
+      sizeBytes: 10485760,
+    },
+    {
+      path: '/m/foto.jpg',
+      name: 'foto.jpg',
+      extension: 'jpg',
+      category: 'image',
+      sizeBytes: 2097152,
+    },
   ],
   rejected: [],
 };
@@ -69,6 +87,7 @@ async function addDraft(wrapper: VueWrapper, draft: AddFilesResult = MIXED): Pro
 
 function installApi(): void {
   vi.clearAllMocks();
+  window.localStorage.clear();
   apiMock.onQueueUpdated.mockReturnValue(() => undefined);
   apiMock.openFiles.mockResolvedValue({ cancelled: true, files: [] });
   apiMock.inspectFiles.mockResolvedValue({ files: [], rejected: [] });
@@ -131,7 +150,15 @@ describe('category grouping', () => {
     const wrapper = mount(App);
     await flushPromises();
     await addDraft(wrapper, {
-      files: [{ path: '/m/only.mp4', name: 'only.mp4', extension: 'mp4', category: 'video' }],
+      files: [
+        {
+          path: '/m/only.mp4',
+          name: 'only.mp4',
+          extension: 'mp4',
+          category: 'video',
+          sizeBytes: 52428800,
+        },
+      ],
       rejected: [],
     });
 

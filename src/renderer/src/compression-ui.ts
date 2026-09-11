@@ -1,4 +1,4 @@
-import { parseTargetSizeMb } from '@conversion/compress';
+import { bytesToMb, parseTargetSizeMb } from '@conversion/compress';
 import type { CompressionEstimate } from '@shared/ipc';
 
 export function formatMb(mb: number): string {
@@ -7,6 +7,39 @@ export function formatMb(mb: number): string {
 
 export function parseMaxMb(raw: string): number | null {
   return parseTargetSizeMb(raw);
+}
+
+export function originalSizeMb(sizeBytes: number): number | null {
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return null;
+  return bytesToMb(sizeBytes);
+}
+
+export interface InitialSizeInput {
+  sizeBytes: number;
+  recommendedMinMb: number | null;
+  hardMinMb: number | null;
+}
+
+const SEED_MARGIN_MB = 100;
+
+export function initialSizeMb(input: InitialSizeInput): number | null {
+  const limitMb = originalSizeMb(input.sizeBytes);
+  if (limitMb === null) return null;
+  const recommended = input.recommendedMinMb ?? input.hardMinMb;
+  if (recommended === null || recommended <= 0) return null;
+  const candidate = recommended + SEED_MARGIN_MB;
+  const hardFloor =
+    input.hardMinMb === null ? 0 : Math.min(input.hardMinMb, limitMb);
+  const seed = Math.max(Math.min(candidate, limitMb), hardFloor);
+  const rounded = Math.min(Math.floor(seed * 100) / 100, limitMb);
+  return rounded > 0 ? rounded : limitMb;
+}
+
+export function maxSizeWithinLimit(raw: string, sizeBytes: number): boolean {
+  const parsed = parseMaxMb(raw);
+  if (parsed === null) return false;
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return true;
+  return parsed <= originalSizeMb(sizeBytes)!;
 }
 
 export type HintKind = 'info' | 'warning' | 'error';

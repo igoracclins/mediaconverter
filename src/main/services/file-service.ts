@@ -40,6 +40,14 @@ interface ExpandedPath {
   silent: boolean;
 }
 
+function fileSizeBytes(filePath: string): number {
+  try {
+    return statSync(filePath).size;
+  } catch {
+    return 0;
+  }
+}
+
 export function inspectFiles(paths: readonly string[]): AddFilesResult {
   const files: FileDescriptor[] = [];
   const rejected: { path: string; reason: AppErrorCode }[] = [];
@@ -91,6 +99,7 @@ export function inspectFiles(paths: readonly string[]): AddFilesResult {
       name: detected.name,
       extension: detected.extension,
       category: detected.category,
+      sizeBytes: fileSizeBytes(entry.path),
     });
   }
 

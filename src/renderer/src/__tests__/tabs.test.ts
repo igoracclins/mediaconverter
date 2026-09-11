@@ -58,16 +58,32 @@ function tabButton(wrapper: VueWrapper): (label: string) => DOMWrapper<Element> 
 }
 
 function numberInputs(wrapper: VueWrapper): DOMWrapper<HTMLInputElement>[] {
-  return wrapper.findAll<HTMLInputElement>('input[type="number"]');
+  return wrapper.findAll<HTMLInputElement>('input[inputmode="decimal"]');
 }
 
 const DRAFT_A: AddFilesResult = {
-  files: [{ path: '/tmp/a.wav', name: 'a.wav', extension: 'wav', category: 'audio' }],
+  files: [
+    {
+      path: '/tmp/a.ogg',
+      name: 'a.ogg',
+      extension: 'ogg',
+      category: 'audio',
+      sizeBytes: 104857600,
+    },
+  ],
   rejected: [],
 };
 
 const DRAFT_B: AddFilesResult = {
-  files: [{ path: '/tmp/b.wav', name: 'b.wav', extension: 'wav', category: 'audio' }],
+  files: [
+    {
+      path: '/tmp/b.ogg',
+      name: 'b.ogg',
+      extension: 'ogg',
+      category: 'audio',
+      sizeBytes: 104857600,
+    },
+  ],
   rejected: [],
 };
 
@@ -96,6 +112,7 @@ function lastEstimateCallFor(path: string): CompressionEstimateRequest | undefin
 function installApi(): void {
   vi.useFakeTimers();
   vi.clearAllMocks();
+  window.localStorage.clear();
   apiMock.onQueueUpdated.mockReturnValue(() => undefined);
   apiMock.openFiles.mockResolvedValue({ cancelled: true, files: [] });
   apiMock.inspectFiles.mockResolvedValue({ files: [], rejected: [] });
@@ -127,7 +144,7 @@ describe('App mode tabs', () => {
 
     expect(wrapper.text()).not.toContain('Perfil');
     expect(wrapper.text()).not.toContain('Tamanho máximo');
-    expect(wrapper.find('input[type="number"]').exists()).toBe(false);
+    expect(wrapper.find('input[inputmode="decimal"]').exists()).toBe(false);
 
     wrapper.unmount();
   });
@@ -141,8 +158,8 @@ describe('App mode tabs', () => {
 
     const html = wrapper.html();
     expect(wrapper.text()).toContain('Tamanho máximo');
-    expect(wrapper.text()).toContain('Comprimir 1 arquivo');
-    expect(wrapper.find('input[type="number"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Comprimir 1 áudio');
+    expect(wrapper.find('input[inputmode="decimal"]').exists()).toBe(true);
 
     expect(html).not.toContain('não ultrapassará o tamanho máximo');
     expect(html).not.toContain('prioriza a melhor qualidade');
@@ -192,8 +209,8 @@ describe('Compressão individual por arquivo', () => {
     const wrapper = await setupTwo();
 
     expect(wrapper.findAll('select').length).toBe(0);
-    expect(numberInputs(wrapper)[0]!.element.value).toBe('14');
-    expect(numberInputs(wrapper)[1]!.element.value).toBe('14');
+    expect(numberInputs(wrapper)[0]!.element.value).toBe('100');
+    expect(numberInputs(wrapper)[1]!.element.value).toBe('100');
 
     wrapper.unmount();
   });
@@ -222,7 +239,7 @@ describe('Compressão individual por arquivo', () => {
 
     expect(numberInputs(wrapper)[0]!.element.value).toBe('45');
     expect(numberInputs(wrapper)[1]!.element.value).toBe('100');
-    expect(lastEstimateCallFor('/tmp/b.wav')?.maxSizeMb).toBe(100);
+    expect(lastEstimateCallFor('/tmp/b.ogg')?.maxSizeMb).toBe(100);
 
     wrapper.unmount();
   });
@@ -234,8 +251,8 @@ describe('Compressão individual por arquivo', () => {
     await numberInputs(wrapper)[1]!.setValue('100');
     await settle();
 
-    expect(lastEstimateCallFor('/tmp/a.wav')?.maxSizeMb).toBe(30);
-    expect(lastEstimateCallFor('/tmp/b.wav')?.maxSizeMb).toBe(100);
+    expect(lastEstimateCallFor('/tmp/a.ogg')?.maxSizeMb).toBe(30);
+    expect(lastEstimateCallFor('/tmp/b.ogg')?.maxSizeMb).toBe(100);
 
     wrapper.unmount();
   });
@@ -247,7 +264,7 @@ describe('Compressão individual por arquivo', () => {
     await numberInputs(wrapper)[1]!.setValue('100');
     await settle();
 
-    await tabButton(wrapper)('Comprimir 2 arquivos').trigger('click');
+    await tabButton(wrapper)('Comprimir 2 áudios').trigger('click');
     await flushPromises();
 
     const calls = apiMock.startConversion.mock.calls;
@@ -294,7 +311,7 @@ describe('Compressão individual por arquivo', () => {
     await numberInputs(wrapper)[1]!.setValue('100');
     await settle();
 
-    await tabButton(wrapper)('Comprimir 1 arquivo').trigger('click');
+    await tabButton(wrapper)('Comprimir 1 áudio').trigger('click');
     await flushPromises();
 
     const calls = apiMock.startConversion.mock.calls;
@@ -313,6 +330,75 @@ describe('Compressão individual por arquivo', () => {
     await input.trigger('wheel', { deltaY: -100 });
 
     expect(input.element.value).toBe('30');
+
+    wrapper.unmount();
+  });
+
+  it('clamps the seeded value to the original size for small files', async () => {
+    const wrapper = mount(App);
+    await flushPromises();
+    const draft: AddFilesResult = {
+      files: [
+        {
+          path: '/tmp/tiny.ogg',
+          name: 'tiny.ogg',
+          extension: 'ogg',
+          category: 'audio',
+          sizeBytes: 102400,
+        },
+      ],
+      rejected: [],
+    };
+    apiMock.openFiles.mockResolvedValue({ cancelled: false, files: draft.files });
+    apiMock.inspectFiles.mockResolvedValue(draft);
+    apiMock.estimateCompression.mockResolvedValue({
+      ok: true,
+      estimate: {
+        status: 'ok',
+        currentSizeMb: 0.098,
+        recommendedMinMb: 2,
+        hardMinMb: 1,
+      },
+    });
+    await wrapper.findComponent(DropZone).trigger('click');
+    await flushPromises();
+    await tabButton(wrapper)('Compressão').trigger('click');
+    await settle();
+
+    expect(numberInputs(wrapper)[0]!.element.value).toBe('0.09');
+    const maxValue = numberInputs(wrapper)[0]!.element.getAttribute('max');
+    expect(maxValue).not.toBeNull();
+    expect(Number(maxValue)).toBeCloseTo(102400 / 1048576, 6);
+    expect(Number(numberInputs(wrapper)[0]!.element.value)).toBeLessThanOrEqual(Number(maxValue));
+
+    wrapper.unmount();
+  });
+
+  it('shows an error hint when the max size exceeds the original size', async () => {
+    const wrapper = await setupTwo();
+
+    await numberInputs(wrapper)[0]!.setValue('150');
+    await settle();
+
+    expect(wrapper.text()).toContain('não pode ser maior que o tamanho original');
+
+    wrapper.unmount();
+  });
+
+  it('does not submit a file whose max size exceeds the original size', async () => {
+    const wrapper = await setupTwo();
+
+    await numberInputs(wrapper)[0]!.setValue('30');
+    await numberInputs(wrapper)[1]!.setValue('150');
+    await settle();
+
+    await tabButton(wrapper)('Comprimir 1 áudio').trigger('click');
+    await flushPromises();
+
+    const calls = apiMock.startConversion.mock.calls;
+    expect(calls).toHaveLength(1);
+    const request = calls[0]![0];
+    expect(request.items.map((item) => item.compression)).toEqual([{ maxSizeMb: 30 }]);
 
     wrapper.unmount();
   });

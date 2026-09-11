@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import type { MediaCategory, TargetFormat } from '@shared/types';
 import type { CompressionDraftConfig, DraftItem } from '../types';
-import { parseMaxMb } from '../compression-ui';
+import { maxSizeWithinLimit, parseMaxMb } from '../compression-ui';
 import { keepFormatFor, isLosslessFormat } from '../compression-format';
 import CompressionDraftCard from './CompressionDraftCard.vue';
 
@@ -61,7 +61,10 @@ function isCompressible(item: DraftItem): boolean {
 function isReady(item: DraftItem): boolean {
   if (!isCompressible(item)) return false;
   const cfg = item.compression;
-  return cfg !== undefined && parseMaxMb(cfg.maxSizeRaw) !== null;
+  if (cfg === undefined) return false;
+  const maxMb = parseMaxMb(cfg.maxSizeRaw);
+  if (maxMb === null) return false;
+  return maxSizeWithinLimit(cfg.maxSizeRaw, item.sizeBytes);
 }
 
 const categoryReadyCounts = computed<Record<MediaCategory, number>>(() => {
@@ -90,8 +93,8 @@ function actionLabel(category: MediaCategory, count: number): string {
     </div>
 
     <p class="mb-3 px-1 text-xs text-ink-dim">
-      Cada arquivo é comprimido mantendo o próprio formato original (ex.: MP4 → MP4, MP3 → MP3, JPG
-      → JPG). Defina o tamanho máximo de cada arquivo abaixo.
+      Cada arquivo é comprimido mantendo o próprio formato original (ex.: MP4 -> MP4, MP3 -> MP3, JPG
+      -> JPG). Defina o tamanho máximo de cada arquivo abaixo.
     </p>
 
     <div v-for="group in groups" :key="group.category" class="mb-3">

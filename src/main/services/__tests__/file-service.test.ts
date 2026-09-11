@@ -26,7 +26,12 @@ describe('inspectFiles', () => {
     writeFileSync(audio, 'data');
     const result = inspectFiles([audio]);
     expect(result.files).toHaveLength(1);
-    expect(result.files[0]).toMatchObject({ path: audio, extension: 'ogg', category: 'audio' });
+    expect(result.files[0]).toMatchObject({
+      path: audio,
+      extension: 'ogg',
+      category: 'audio',
+      sizeBytes: 4,
+    });
     expect(result.rejected).toHaveLength(0);
   });
 
