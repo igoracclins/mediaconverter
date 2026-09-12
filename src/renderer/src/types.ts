@@ -8,9 +8,9 @@ export interface BaseDraft extends FileDescriptor {
   id: string;
 }
 
-export interface ConvertDraft extends BaseDraft {}
+export type ConvertDraft = BaseDraft;
 
-export interface ExtractDraft extends BaseDraft {}
+export type ExtractDraft = BaseDraft;
 
 export interface CompressDraft extends BaseDraft {
   compression: CompressionDraftConfig;

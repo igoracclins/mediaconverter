@@ -19,12 +19,10 @@ export function useCompressionStore() {
   async function addFiles(paths: string[]): Promise<BannerMessage | null> {
     const result = await window.api.inspectFiles(paths);
     const seen = new Set(drafts.value.map((d) => d.path));
-    let added = 0;
     for (const file of result.files) {
       if (seen.has(file.path)) continue;
       seen.add(file.path);
       drafts.value.push({ ...file, id: file.path, compression: newCompressionConfig() });
-      added++;
     }
     if (result.rejected.length > 0) {
       return result.rejected.length === 1

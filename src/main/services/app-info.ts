@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { app } from 'electron';
 import { resolveFfmpegBinaries } from '@platform/paths';
 import { currentArch, currentPlatform } from '@platform/info';
 import type { AppInfo } from '@shared/ipc';
@@ -22,7 +23,7 @@ export function getAppInfo(opts: { resourcesBaseDir: string }): AppInfo {
   }
 
   cached = {
-    appVersion: process.env.npm_package_version ?? '0.1.0',
+    appVersion: app.getVersion(),
     electronVersion: process.versions.electron ?? 'unknown',
     platform: platform === 'darwin' ? 'macOS' : platform === 'win32' ? 'Windows' : 'Linux',
     arch,

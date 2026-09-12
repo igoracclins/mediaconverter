@@ -177,9 +177,13 @@ describe('Compressão individual por arquivo', () => {
 
     const html = wrapper.html();
     expect(wrapper.text()).toContain('Tamanho máximo');
-    expect(wrapper.text()).toContain('Comprimir 1 áudio');
     expect(wrapper.text()).toContain('Defina um tamanho máximo (em MB) para este arquivo.');
     expect(wrapper.find('input[inputmode="decimal"]').exists()).toBe(true);
+
+    const sizeInput = wrapper.find('input[inputmode="decimal"]');
+    await sizeInput.setValue('50');
+    await nextTick();
+    expect(wrapper.text()).toContain('Comprimir 1 áudio');
 
     expect(html).not.toContain('não ultrapassará o tamanho máximo');
     expect(html).not.toContain('prioriza a melhor qualidade');
@@ -501,17 +505,17 @@ describe('Queue output reveal', () => {
   }
 
   it('shows a reveal button for a completed job and reveals its output', async () => {
-    let listener: ((snapshot: QueueSnapshot) => void) | null = null;
-    apiMock.onQueueUpdated.mockImplementation((cb) => {
-      listener = cb;
+    const queueListener: { current: ((snapshot: QueueSnapshot) => void) | null } = { current: null };
+    apiMock.onQueueUpdated.mockImplementation((cb: (snapshot: QueueSnapshot) => void) => {
+      queueListener.current = cb;
       return () => undefined;
     });
 
     const wrapper = mount(App);
     await flushPromises();
-    expect(listener).not.toBeNull();
+    expect(queueListener.current).not.toBeNull();
 
-    listener?.({ jobs: [completedJob()], running: false, activeCount: 0 });
+    queueListener.current?.({ jobs: [completedJob()], running: false, activeCount: 0 });
     await nextTick();
     await flushPromises();
 
@@ -526,9 +530,9 @@ describe('Queue output reveal', () => {
   });
 
   it('does not show a reveal button for non-completed jobs', async () => {
-    let listener: ((snapshot: QueueSnapshot) => void) | null = null;
-    apiMock.onQueueUpdated.mockImplementation((cb) => {
-      listener = cb;
+    const queueListener: { current: ((snapshot: QueueSnapshot) => void) | null } = { current: null };
+    apiMock.onQueueUpdated.mockImplementation((cb: (snapshot: QueueSnapshot) => void) => {
+      queueListener.current = cb;
       return () => undefined;
     });
 
@@ -538,7 +542,7 @@ describe('Queue output reveal', () => {
     const job = completedJob();
     job.status = 'processing';
     job.outputPath = null;
-    listener?.({ jobs: [job], running: true, activeCount: 1 });
+    queueListener.current?.({ jobs: [job], running: true, activeCount: 1 });
     await nextTick();
     await flushPromises();
 

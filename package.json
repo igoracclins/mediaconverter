@@ -1,7 +1,7 @@
 {
   "name": "mediaconverter",
   "productName": "Media Converter",
-  "version": "0.2.4",
+  "version": "0.4.1",
   "description": "Local-first, cross-platform desktop application for batch media conversion (audio, video and images).",
   "author": "Igor <igoracciolylima@gmail.com>",
   "license": "MIT",

@@ -402,7 +402,7 @@ export class ConversionManager {
     }
   }
 
-  private async executeTask(task: ConversionTask, job: InternalJob): Promise<RunResult> {
+  private async executeTask(task: ConversionTask, _job: InternalJob): Promise<RunResult> {
     const handle = this.service.execute(task, (value) => {
       const current = this.queue.get(task.id);
       if (current) this.queue.replace(setProgress(current, value));

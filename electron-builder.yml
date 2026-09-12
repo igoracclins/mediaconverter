@@ -35,6 +35,8 @@ extraResources:
 asar: true
 asarUnpack:
   - '**/node_modules/sharp/**'
+  - '**/node_modules/@img/sharp-*/**'
+  - '**/node_modules/@img/sharp-libvips-*/**'
 
 npmRebuild: false
 

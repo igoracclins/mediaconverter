@@ -6,6 +6,10 @@ import type { AddFilesResult, FileDescriptor, SelectionResult } from '@shared/ip
 import type { AppErrorCode } from '@shared/types';
 import { logger } from '../logger';
 
+function isOsMetadata(name: string): boolean {
+  return name === '.DS_Store' || name === 'desktop.ini' || name === 'Thumbs.db' || name.startsWith('._');
+}
+
 function collectPathsFromTree(root: string): string[] {
   const collected: string[] = [];
   const stack = [root];
@@ -28,7 +32,7 @@ function collectPathsFromTree(root: string): string[] {
       continue;
     }
     for (const entry of entries) {
-      if (entry === '.ds_store' || entry === '.DS_Store') continue;
+      if (isOsMetadata(entry)) continue;
       stack.push(path.join(current, entry));
     }
   }

@@ -132,18 +132,19 @@ describe('category grouping', () => {
     const groups = wrapper
       .findComponent(DraftList)
       .findAll('h3')
-      .map((h) => h.parent()!.parent()!);
-    const video = groups.find((g) => g.text().includes('Vídeos'))!;
-    const audio = groups.find((g) => g.text().includes('Áudios'))!;
-    const image = groups.find((g) => g.text().includes('Imagens'))!;
+      .map((h) => h.element.parentElement?.parentElement)
+      .filter((el): el is HTMLElement => el !== null && el !== undefined);
+    const video = groups.find((g) => g.textContent!.includes('Vídeos'))!;
+    const audio = groups.find((g) => g.textContent!.includes('Áudios'))!;
+    const image = groups.find((g) => g.textContent!.includes('Imagens'))!;
 
-    expect(video.text()).toContain('video.mp4');
-    expect(video.text()).not.toContain('musica.mp3');
-    expect(video.text()).not.toContain('foto.jpg');
-    expect(audio.text()).toContain('musica.mp3');
-    expect(audio.text()).not.toContain('video.mp4');
-    expect(image.text()).toContain('foto.jpg');
-    expect(image.text()).not.toContain('video.mp4');
+    expect(video.textContent!).toContain('video.mp4');
+    expect(video.textContent!).not.toContain('musica.mp3');
+    expect(video.textContent!).not.toContain('foto.jpg');
+    expect(audio.textContent!).toContain('musica.mp3');
+    expect(audio.textContent!).not.toContain('video.mp4');
+    expect(image.textContent!).toContain('foto.jpg');
+    expect(image.textContent!).not.toContain('video.mp4');
 
     wrapper.unmount();
   });
