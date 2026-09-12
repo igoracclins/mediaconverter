@@ -7,8 +7,14 @@ export interface CompressionDraftConfig {
   lastSyncKey: string | null;
 }
 
-export interface DraftItem extends FileDescriptor {
-  compression?: CompressionDraftConfig;
+export interface BaseDraft extends FileDescriptor {
+  id: string;
+}
+
+export interface ConvertDraft extends BaseDraft {}
+
+export interface CompressDraft extends BaseDraft {
+  compression: CompressionDraftConfig;
 }
 
 export type { FileDescriptor };

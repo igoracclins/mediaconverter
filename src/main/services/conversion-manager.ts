@@ -22,7 +22,7 @@ import type {
   ConversionRequestItem,
   CompressionOptions,
 } from '@shared/ipc';
-import type { AppErrorCode, MediaCategory, TargetFormat } from '@shared/types';
+import type { AppErrorCode, MediaCategory, Operation, TargetFormat } from '@shared/types';
 import { logger } from '../logger';
 import { resolveAndReserveOutput, validateInput } from './output-resolver';
 
@@ -131,7 +131,7 @@ export class ConversionManager {
     let created = 0;
 
     for (const item of request.items) {
-      const outcome = this.enqueue(item, request.destination);
+      const outcome = this.enqueue(item, request.destination, request.operation);
       if (outcome.ok) created++;
       else rejected.push({ inputPath: item.inputPath, error: outcome.error });
     }
@@ -179,20 +179,26 @@ export class ConversionManager {
   private enqueue(
     item: ConversionRequestItem,
     destination: string | null,
+    operation: Operation,
   ): { ok: true } | { ok: false; error: AppErrorCode } {
+    if (operation === 'extract') {
+      return { ok: false, error: 'INVALID_REQUEST' };
+    }
     const detected = detectPath(item.inputPath);
     if (!detected) {
       return { ok: false, error: 'UNSUPPORTED_SOURCE' };
     }
-    const isCompression = item.compression !== undefined;
+    const isCompression = operation === 'compress';
     const category = isCompression
       ? detected.category
       : categoryOf(item.targetFormat);
     if (!FORMATS_BY_CATEGORY[category].some((f) => f.id === item.targetFormat)) {
       return { ok: false, error: 'INVALID_REQUEST' };
     }
-    if (item.compression !== undefined && !isValidCompressionOptions(item.compression)) {
-      return { ok: false, error: 'INVALID_REQUEST' };
+    if (isCompression) {
+      if (item.compression === undefined || !isValidCompressionOptions(item.compression)) {
+        return { ok: false, error: 'INVALID_REQUEST' };
+      }
     }
     const inputValid = validateInput(item.inputPath);
     if (!inputValid.ok) return { ok: false, error: inputValid.error };

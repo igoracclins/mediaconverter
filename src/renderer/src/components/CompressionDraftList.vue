@@ -1,76 +1,32 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { MediaCategory, TargetFormat } from '@shared/types';
-import type { CompressionDraftConfig, DraftItem } from '../types';
-import { maxSizeWithinLimit, parseMaxMb } from '../compression-ui';
-import { keepFormatFor, isLosslessFormat } from '../compression-format';
+import type { MediaCategory } from '@shared/types';
+import type { CompressionDraftConfig, CompressDraft } from '../types';
+import { isCompressionReady } from '../compression-ui';
+import {
+  CATEGORY_LABELS,
+  CATEGORY_PLURAL,
+  CATEGORY_SINGULAR,
+  countLabel,
+  groupByCategory,
+} from '../grouping';
 import CompressionDraftCard from './CompressionDraftCard.vue';
 
-const props = defineProps<{ items: DraftItem[]; converting: boolean }>();
+const props = defineProps<{ items: CompressDraft[]; converting: boolean }>();
 const emit = defineEmits<{
-  remove: [index: number];
-  updateConfig: [index: number, patch: Partial<Pick<CompressionDraftConfig, 'maxSizeRaw'>>];
+  remove: [id: string];
+  updateConfig: [id: string, patch: Partial<Pick<CompressionDraftConfig, 'maxSizeRaw'>>];
   compress: [category: MediaCategory];
 }>();
 
-const CATEGORY_ORDER: MediaCategory[] = ['video', 'audio', 'image'];
-
-const CATEGORY_LABELS: Record<MediaCategory, string> = {
-  video: 'Vídeos',
-  audio: 'Áudios',
-  image: 'Imagens',
-};
-
-const CATEGORY_SINGULAR: Record<MediaCategory, string> = {
-  video: 'vídeo',
-  audio: 'áudio',
-  image: 'imagem',
-};
-
-const CATEGORY_PLURAL: Record<MediaCategory, string> = {
-  video: 'vídeos',
-  audio: 'áudios',
-  image: 'imagens',
-};
-
-const groups = computed<
-  { category: MediaCategory; entries: { item: DraftItem; index: number }[] }[]
->(() => {
-  return CATEGORY_ORDER.map((category) => {
-    const entries: { item: DraftItem; index: number }[] = [];
-    props.items.forEach((item, index) => {
-      if (item.category === category) entries.push({ item, index });
-    });
-    return { category, entries };
-  }).filter((group) => group.entries.length > 0);
-});
-
-function targetFor(item: DraftItem): TargetFormat | null {
-  return keepFormatFor(item.category, item.extension);
-}
-
-function isLossless(item: DraftItem): boolean {
-  const format = targetFor(item);
-  return format !== null && isLosslessFormat(format);
-}
-
-function isCompressible(item: DraftItem): boolean {
-  return targetFor(item) !== null && !isLossless(item);
-}
-
-function isReady(item: DraftItem): boolean {
-  if (!isCompressible(item)) return false;
-  const cfg = item.compression;
-  if (cfg === undefined) return false;
-  const maxMb = parseMaxMb(cfg.maxSizeRaw);
-  if (maxMb === null) return false;
-  return maxSizeWithinLimit(cfg.maxSizeRaw, item.sizeBytes);
-}
+const groups = computed(() => groupByCategory(props.items));
 
 const categoryReadyCounts = computed<Record<MediaCategory, number>>(() => {
   const counts: Record<MediaCategory, number> = { video: 0, audio: 0, image: 0 };
   for (const item of props.items) {
-    if (isReady(item)) counts[item.category] += 1;
+    if (isCompressionReady(item.category, item.extension, item.compression, item.sizeBytes)) {
+      counts[item.category] += 1;
+    }
   }
   return counts;
 });
@@ -87,9 +43,7 @@ function actionLabel(category: MediaCategory, count: number): string {
       <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-dim">
         Compressão por arquivo
       </h2>
-      <span class="text-xs text-ink-dim">
-        {{ items.length }} {{ items.length === 1 ? 'arquivo' : 'arquivos' }}
-      </span>
+      <span class="text-xs text-ink-dim">{{ countLabel(items.length) }}</span>
     </div>
 
     <p class="mb-3 px-1 text-xs text-ink-dim">
@@ -100,19 +54,16 @@ function actionLabel(category: MediaCategory, count: number): string {
     <div v-for="group in groups" :key="group.category" class="mb-3">
       <div class="mb-1.5 flex items-baseline gap-2 px-1">
         <h3 class="text-sm font-semibold text-ink">{{ CATEGORY_LABELS[group.category] }}</h3>
-        <span class="text-xs text-ink-dim">
-          {{ group.entries.length }} {{ group.entries.length === 1 ? 'arquivo' : 'arquivos' }}
-        </span>
+        <span class="text-xs text-ink-dim">{{ countLabel(group.entries.length) }}</span>
       </div>
 
       <ul class="divide-y divide-edge overflow-hidden rounded-xl border border-edge bg-surface-alt">
         <CompressionDraftCard
           v-for="entry in group.entries"
-          :key="`${entry.item.path}:${entry.index}`"
+          :key="entry.item.id"
           :item="entry.item"
-          :index="entry.index"
-          @remove="(index) => emit('remove', index)"
-          @update-max="(index, value) => emit('updateConfig', index, { maxSizeRaw: value })"
+          @remove="(id) => emit('remove', id)"
+          @update-max="(id, value) => emit('updateConfig', id, { maxSizeRaw: value })"
         />
       </ul>
 

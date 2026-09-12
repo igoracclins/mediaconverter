@@ -3,6 +3,7 @@ import type {
   ConversionEngineId,
   JobStatus,
   MediaCategory,
+  Operation,
   QualityPreset,
   TargetFormat,
 } from './types';
@@ -40,6 +41,7 @@ export interface ConversionRequestItem {
 }
 
 export interface StartConversionRequest {
+  operation: Operation;
   items: ConversionRequestItem[];
   destination: string | null;
 }

@@ -103,6 +103,25 @@ describe('registerIpc', () => {
     expect(managerMock.start).not.toHaveBeenCalled();
   });
 
+  it('rejects start requests with an unknown or unimplemented operation', async () => {
+    registerIpc(makeDeps());
+    const baseItem = { inputPath: '/tmp/a.wav', targetFormat: 'mp3', quality: 'high' };
+    const cases: unknown[] = [
+      { operation: 'bake', items: [baseItem], destination: null },
+      { operation: 'extract', items: [baseItem], destination: null },
+      { items: [baseItem], destination: null },
+    ];
+    for (const request of cases) {
+      const result = (await invoke(IPC.StartConversion, request)) as {
+        ok: boolean;
+        error?: string;
+      };
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe('INVALID_REQUEST');
+    }
+    expect(managerMock.start).not.toHaveBeenCalled();
+  });
+
   it('rejects malformed compression estimate requests', async () => {
     registerIpc(makeDeps());
     const cases: unknown[] = [
@@ -133,15 +152,16 @@ describe('registerIpc', () => {
     expect(result.estimate?.status).toBe('unsupported');
   });
 
-  it('reject start items with invalid compression payloads', async () => {
+  it('rejects convert items that carry compression options', async () => {
     registerIpc(makeDeps());
     const result = (await invoke(IPC.StartConversion, {
+      operation: 'convert',
       items: [
         {
           inputPath: '/tmp/a.wav',
           targetFormat: 'mp3',
           quality: 'high',
-          compression: { maxSizeMb: 0 },
+          compression: { maxSizeMb: 30 },
         },
       ],
       destination: null,
@@ -151,9 +171,54 @@ describe('registerIpc', () => {
     expect(managerMock.start).not.toHaveBeenCalled();
   });
 
+  it('rejects compress items without valid compression payloads', async () => {
+    registerIpc(makeDeps());
+    const cases: unknown[] = [
+      {
+        operation: 'compress',
+        items: [{ inputPath: '/tmp/a.wav', targetFormat: 'mp3', quality: 'high' }],
+        destination: null,
+      },
+      {
+        operation: 'compress',
+        items: [
+          {
+            inputPath: '/tmp/a.wav',
+            targetFormat: 'mp3',
+            quality: 'high',
+            compression: { maxSizeMb: 0 },
+          },
+        ],
+        destination: null,
+      },
+      {
+        operation: 'compress',
+        items: [
+          {
+            inputPath: '/tmp/a.wav',
+            targetFormat: 'mp3',
+            quality: 'high',
+            compression: { maxSizeMb: -1 },
+          },
+        ],
+        destination: null,
+      },
+    ];
+    for (const request of cases) {
+      const result = (await invoke(IPC.StartConversion, request)) as {
+        ok: boolean;
+        error?: string;
+      };
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe('INVALID_REQUEST');
+    }
+    expect(managerMock.start).not.toHaveBeenCalled();
+  });
+
   it('forwards start requests that include valid compression options', async () => {
     registerIpc(makeDeps());
     const request: StartConversionRequest = {
+      operation: 'compress',
       items: [
         {
           inputPath: '/tmp/a.wav',
@@ -173,6 +238,7 @@ describe('registerIpc', () => {
     registerIpc(makeDeps());
 
     const request: StartConversionRequest = {
+      operation: 'convert',
       items: [{ inputPath: '/tmp/a.wav', targetFormat: 'mp3', quality: 'high' }],
       destination: '/tmp/out',
     };
@@ -226,6 +292,7 @@ describe('registerIpc', () => {
     expect(estimate.error).toBe('INVALID_REQUEST');
 
     const start = (await invokeWithEvent(event, IPC.StartConversion, {
+      operation: 'convert',
       items: [{ inputPath: '/tmp/a.wav', targetFormat: 'mp3', quality: 'high' }],
       destination: '/tmp/out',
     })) as { ok: boolean; error?: string };
@@ -249,6 +316,7 @@ describe('registerIpc', () => {
     expect(open.cancelled).toBe(true);
 
     const start = (await invoke(IPC.StartConversion, {
+      operation: 'convert',
       items: [{ inputPath: '/tmp/a.wav', targetFormat: 'mp3', quality: 'high' }],
       destination: '/tmp/out',
     })) as { ok: boolean; error?: string };

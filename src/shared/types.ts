@@ -8,6 +8,8 @@ export type TargetFormat = AudioTargetFormat | VideoTargetFormat | ImageTargetFo
 
 export type QualityPreset = 'high' | 'medium' | 'low';
 
+export type Operation = 'convert' | 'compress' | 'extract';
+
 export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
 
 export type ConversionEngineId = 'ffmpeg' | 'sharp';

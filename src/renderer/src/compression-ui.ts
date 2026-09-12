@@ -1,6 +1,9 @@
 import { bytesToMb, parseTargetSizeMb } from '@conversion/compress';
+import { TARGET_FORMAT_MAP } from '@shared/formats';
 import type { CompressionEstimate } from '@shared/ipc';
-import type { MediaCategory } from '@shared/types';
+import type { MediaCategory, TargetFormat } from '@shared/types';
+import { keepFormatFor, isLosslessFormat } from './compression-format';
+import type { CompressionDraftConfig } from './types';
 
 export function formatMb(mb: number): string {
   return `${Math.round(mb * 100) / 100} MB`;
@@ -107,4 +110,34 @@ export function compressionHint(
     };
   }
   return { kind: 'info', text: 'Configuração possível dentro do limite.' };
+}
+
+export interface CompressTarget {
+  format: TargetFormat;
+  label: string;
+  lossless: boolean;
+}
+
+export function compressTargetFor(category: MediaCategory, extension: string): CompressTarget | null {
+  const format = keepFormatFor(category, extension);
+  if (!format) return null;
+  return {
+    format,
+    label: TARGET_FORMAT_MAP[format].label,
+    lossless: isLosslessFormat(format),
+  };
+}
+
+export function isCompressionReady(
+  category: MediaCategory,
+  extension: string,
+  cfg: CompressionDraftConfig | null,
+  sizeBytes: number,
+): boolean {
+  if (!cfg) return false;
+  const target = compressTargetFor(category, extension);
+  if (!target || target.lossless) return false;
+  const maxMb = parseMaxMb(cfg.maxSizeRaw);
+  if (maxMb === null) return false;
+  return maxSizeWithinLimit(cfg.maxSizeRaw, sizeBytes);
 }

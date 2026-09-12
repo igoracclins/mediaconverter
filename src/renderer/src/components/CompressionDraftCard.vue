@@ -1,59 +1,58 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { TARGET_FORMAT_MAP } from '@shared/formats';
-import type { DraftItem } from '../types';
-import { compressionHint, formatMb, originalSizeMb, parseMaxMb, type HintKind } from '../compression-ui';
-import { keepFormatFor, isLosslessFormat } from '../compression-format';
+import type { CompressDraft } from '../types';
+import {
+  compressTargetFor,
+  compressionHint,
+  formatMb,
+  originalSizeMb,
+  parseMaxMb,
+  type HintKind,
+} from '../compression-ui';
 
-const props = defineProps<{ item: DraftItem; index: number }>();
+const props = defineProps<{ item: CompressDraft }>();
 const emit = defineEmits<{
-  remove: [index: number];
-  updateMax: [index: number, value: string];
+  remove: [id: string];
+  updateMax: [id: string, value: string];
 }>();
 
 const view = computed(() => {
   const item = props.item;
   const cfg = item.compression;
-  const format = keepFormatFor(item.category, item.extension);
-  const lossless = format !== null && isLosslessFormat(format);
-  const compressible = format !== null && !lossless;
-  const label = format ? TARGET_FORMAT_MAP[format].label : null;
-  const estimate = cfg?.estimate;
+  const target = compressTargetFor(item.category, item.extension);
+  const compressible = target !== null && !target.lossless;
+  const label = target?.label ?? null;
+  const estimate = cfg.estimate;
   const sizeText = estimate && estimate.currentSizeMb > 0 ? formatMb(estimate.currentSizeMb) : null;
-  const maxSizeRaw = cfg?.maxSizeRaw ?? '';
-  const limitMb = cfg ? originalSizeMb(item.sizeBytes) : null;
+  const maxSizeRaw = cfg.maxSizeRaw;
+  const limitMb = originalSizeMb(item.sizeBytes);
   let hint: { kind: HintKind; text: string } | null = null;
-  if (cfg) {
-    const parsed = parseMaxMb(maxSizeRaw);
-    if (lossless) {
-      hint = {
-        kind: 'warning',
-        text: `O formato ${label} é sem perdas: ele não reduz o tamanho sob demanda mantendo o formato original.`,
-      };
-    } else if (!compressible) {
-      hint = {
-        kind: 'warning',
-        text: 'Não é possível comprimir este arquivo mantendo o formato original.',
-      };
-    } else if (parsed === null) {
-      hint =
-        maxSizeRaw.trim() === ''
-          ? { kind: 'info', text: 'Defina um tamanho máximo (em MB) para este arquivo.' }
-          : { kind: 'error', text: 'Informe um tamanho máximo maior que zero (em MB).' };
-    } else if (limitMb !== null && parsed > limitMb) {
-      hint = {
-        kind: 'error',
-        text: `O tamanho máximo não pode ser maior que o tamanho original do arquivo (${formatMb(limitMb)}).`,
-      };
-    } else {
-      hint = compressionHint(cfg.estimate, label ?? '', props.item.sizeBytes, parsed);
-    }
+  const parsed = parseMaxMb(maxSizeRaw);
+  if (!compressible) {
+    hint = {
+      kind: 'warning',
+      text: target
+        ? `O formato ${label} é sem perdas: ele não reduz o tamanho sob demanda mantendo o formato original.`
+        : 'Não é possível comprimir este arquivo mantendo o formato original.',
+    };
+  } else if (parsed === null) {
+    hint =
+      maxSizeRaw.trim() === ''
+        ? { kind: 'info', text: 'Defina um tamanho máximo (em MB) para este arquivo.' }
+        : { kind: 'error', text: 'Informe um tamanho máximo maior que zero (em MB).' };
+  } else if (limitMb !== null && parsed > limitMb) {
+    hint = {
+      kind: 'error',
+      text: `O tamanho máximo não pode ser maior que o tamanho original do arquivo (${formatMb(limitMb)}).`,
+    };
+  } else {
+    hint = compressionHint(cfg.estimate, label ?? '', item.sizeBytes, parsed);
   }
   return { label, sizeText, compressible, maxSizeRaw, hint, limitMb };
 });
 
 function onTarget(event: Event): void {
-  emit('updateMax', props.index, (event.target as HTMLInputElement).value);
+  emit('updateMax', props.item.id, (event.target as HTMLInputElement).value);
 }
 
 function onWheel(event: WheelEvent): void {
@@ -92,7 +91,7 @@ function hintClass(kind: HintKind): string {
         type="button"
         class="shrink-0 rounded-md px-2 py-1 text-sm text-ink-dim transition-colors hover:bg-surface-raised hover:text-danger"
         :title="`Remover ${item.name}`"
-        @click="emit('remove', index)"
+        @click="emit('remove', item.id)"
       >
         ✕
       </button>
@@ -118,23 +117,10 @@ function hintClass(kind: HintKind): string {
           </span>
         </label>
       </div>
+    </template>
 
-      <p
-        v-if="view.hint"
-        class="text-xs"
-        :class="hintClass(view.hint.kind)"
-      >
-        {{ view.hint.text }}
-      </p>
-    </template>
-    <template v-else>
-      <p
-        v-if="view.hint"
-        class="text-xs"
-        :class="hintClass(view.hint.kind)"
-      >
-        {{ view.hint.text }}
-      </p>
-    </template>
+    <p v-if="view.hint" class="text-xs" :class="hintClass(view.hint.kind)">
+      {{ view.hint.text }}
+    </p>
   </li>
 </template>

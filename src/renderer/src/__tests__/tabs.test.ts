@@ -53,8 +53,10 @@ const apiMock = {
   ),
 };
 
-function tabButton(wrapper: VueWrapper): (label: string) => DOMWrapper<Element> {
-  return (label: string) => wrapper.findAll('button').find((b) => b.text().trim() === label)!;
+async function pickOperation(wrapper: VueWrapper, label: string): Promise<void> {
+  const button = wrapper.findAll('button').find((b) => b.text().includes(label))!;
+  await button.trigger('click');
+  await flushPromises();
 }
 
 function numberInputs(wrapper: VueWrapper): DOMWrapper<HTMLInputElement>[] {
@@ -129,13 +131,14 @@ function installApi(): void {
   win.api = apiMock as unknown as RendererApi;
 }
 
-describe('App mode tabs', () => {
+describe('Conversion operation flow', () => {
   beforeEach(installApi);
   afterEach(() => vi.useRealTimers());
 
-  it('Conversão tab shows only conversion controls', async () => {
+  it('shows only conversion controls', async () => {
     const wrapper = mount(App);
     await flushPromises();
+    await pickOperation(wrapper, 'Conversão');
     await addDraft(wrapper);
 
     expect(wrapper.text()).toContain('Converter todos para');
@@ -149,11 +152,56 @@ describe('App mode tabs', () => {
     wrapper.unmount();
   });
 
-  it('Compressão tab shows only compression controls without the removed guarantee message', async () => {
+  it('keeps the normal conversion global (per-format, no compression)', async () => {
     const wrapper = mount(App);
     await flushPromises();
+    await pickOperation(wrapper, 'Conversão');
+    await addDraft(wrapper, DRAFT_A);
+    await addDraft(wrapper, DRAFT_B);
+
+    expect((wrapper.find('#convert-format-audio').element as HTMLSelectElement).value).toBe('mp3');
+    expect(wrapper.text()).toContain('Converter 2 áudios');
+
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === 'Converter 2 áudios')!
+      .trigger('click');
+    await flushPromises();
+
+    const calls = apiMock.startConversion.mock.calls;
+    expect(calls).toHaveLength(1);
+    const request = calls[0]![0];
+    expect(request.operation).toBe('convert');
+    expect(request.destination).toBeNull();
+    expect(request.items).toHaveLength(2);
+    for (const item of request.items) {
+      expect(item.targetFormat).toBe('mp3');
+      expect(item.compression).toBeUndefined();
+    }
+
+    wrapper.unmount();
+  });
+});
+
+describe('Compressão individual por arquivo', () => {
+  beforeEach(installApi);
+  afterEach(() => vi.useRealTimers());
+
+  async function setupTwo(): Promise<VueWrapper> {
+    const wrapper = mount(App);
+    await flushPromises();
+    await pickOperation(wrapper, 'Compressão');
+    await addDraft(wrapper, DRAFT_A);
+    await addDraft(wrapper, DRAFT_B);
+    await settle();
+    return wrapper;
+  }
+
+  it('shows only compression controls without the removed guarantee message', async () => {
+    const wrapper = mount(App);
+    await flushPromises();
+    await pickOperation(wrapper, 'Compressão');
     await addDraft(wrapper);
-    await tabButton(wrapper)('Compressão').trigger('click');
     await settle();
 
     const html = wrapper.html();
@@ -174,14 +222,30 @@ describe('App mode tabs', () => {
     wrapper.unmount();
   });
 
-  it('toggles back to the conversion-only controls', async () => {
+  it('switches back to the conversion-only controls', async () => {
     const wrapper = mount(App);
     await flushPromises();
+    await pickOperation(wrapper, 'Conversão');
     await addDraft(wrapper);
-    await tabButton(wrapper)('Compressão').trigger('click');
-    await settle();
-    await tabButton(wrapper)('Conversão').trigger('click');
+    expect(wrapper.text()).toContain('Converter todos para');
+
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === 'Trocar operação')!
+      .trigger('click');
     await flushPromises();
+    await pickOperation(wrapper, 'Compressão');
+    await addDraft(wrapper);
+    await settle();
+    expect(wrapper.text()).toContain('Tamanho máximo');
+
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === 'Trocar operação')!
+      .trigger('click');
+    await flushPromises();
+    await pickOperation(wrapper, 'Conversão');
+    await addDraft(wrapper);
 
     expect(wrapper.text()).toContain('Converter todos para');
     expect(wrapper.find('#convert-format-audio').exists()).toBe(true);
@@ -189,21 +253,6 @@ describe('App mode tabs', () => {
 
     wrapper.unmount();
   });
-});
-
-describe('Compressão individual por arquivo', () => {
-  beforeEach(installApi);
-  afterEach(() => vi.useRealTimers());
-
-  async function setupTwo(): Promise<VueWrapper> {
-    const wrapper = mount(App);
-    await flushPromises();
-    await addDraft(wrapper, DRAFT_A);
-    await addDraft(wrapper, DRAFT_B);
-    await tabButton(wrapper)('Compressão').trigger('click');
-    await settle();
-    return wrapper;
-  }
 
   it('seeds each file max size from the estimator and there is no profile select', async () => {
     const wrapper = await setupTwo();
@@ -264,42 +313,21 @@ describe('Compressão individual por arquivo', () => {
     await numberInputs(wrapper)[1]!.setValue('100');
     await settle();
 
-    await tabButton(wrapper)('Comprimir 2 áudios').trigger('click');
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === 'Comprimir 2 áudios')!
+      .trigger('click');
     await flushPromises();
 
     const calls = apiMock.startConversion.mock.calls;
     expect(calls).toHaveLength(1);
     const request = calls[0]![0];
+    expect(request.operation).toBe('compress');
     expect(request.destination).toBeNull();
     expect(request.items.map((item) => item.compression)).toEqual([
       { maxSizeMb: 30 },
       { maxSizeMb: 100 },
     ]);
-
-    wrapper.unmount();
-  });
-
-  it('keeps the normal conversion global (per-format, no compression)', async () => {
-    const wrapper = mount(App);
-    await flushPromises();
-    await addDraft(wrapper, DRAFT_A);
-    await addDraft(wrapper, DRAFT_B);
-
-    expect((wrapper.find('#convert-format-audio').element as HTMLSelectElement).value).toBe('mp3');
-    expect(wrapper.text()).toContain('Converter 2 áudios');
-
-    await tabButton(wrapper)('Converter 2 áudios').trigger('click');
-    await flushPromises();
-
-    const calls = apiMock.startConversion.mock.calls;
-    expect(calls).toHaveLength(1);
-    const request = calls[0]![0];
-    expect(request.destination).toBeNull();
-    expect(request.items).toHaveLength(2);
-    for (const item of request.items) {
-      expect(item.targetFormat).toBe('mp3');
-      expect(item.compression).toBeUndefined();
-    }
 
     wrapper.unmount();
   });
@@ -311,7 +339,10 @@ describe('Compressão individual por arquivo', () => {
     await numberInputs(wrapper)[1]!.setValue('100');
     await settle();
 
-    await tabButton(wrapper)('Comprimir 1 áudio').trigger('click');
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === 'Comprimir 1 áudio')!
+      .trigger('click');
     await flushPromises();
 
     const calls = apiMock.startConversion.mock.calls;
@@ -337,6 +368,7 @@ describe('Compressão individual por arquivo', () => {
   it('never seeds above the original file size for small files', async () => {
     const wrapper = mount(App);
     await flushPromises();
+    await pickOperation(wrapper, 'Compressão');
     const draft: AddFilesResult = {
       files: [
         {
@@ -362,7 +394,6 @@ describe('Compressão individual por arquivo', () => {
     });
     await wrapper.findComponent(DropZone).trigger('click');
     await flushPromises();
-    await tabButton(wrapper)('Compressão').trigger('click');
     await settle();
 
     expect(numberInputs(wrapper)[0]!.element.value).toBe('0.09');
@@ -392,7 +423,10 @@ describe('Compressão individual por arquivo', () => {
     await numberInputs(wrapper)[1]!.setValue('150');
     await settle();
 
-    await tabButton(wrapper)('Comprimir 1 áudio').trigger('click');
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === 'Comprimir 1 áudio')!
+      .trigger('click');
     await flushPromises();
 
     const calls = apiMock.startConversion.mock.calls;

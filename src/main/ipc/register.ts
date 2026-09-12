@@ -13,6 +13,7 @@ import { getAppInfo } from '../services/app-info';
 import { estimateCompression } from '../services/compression-estimate';
 import { inspectFiles, openFilesDialog } from '../services/file-service';
 import type { ConversionManager } from '../services/conversion-manager';
+import type { Operation } from '@shared/types';
 import { logger } from '../logger';
 
 export interface IpcDependencies {
@@ -22,21 +23,34 @@ export interface IpcDependencies {
   getWindow: () => BrowserWindow;
 }
 
-function isRequestItem(value: unknown): boolean {
+const OPERATIONS: readonly Operation[] = ['convert', 'compress', 'extract'];
+
+function operationFromValue(value: unknown): Operation | null {
+  return OPERATIONS.includes(value as Operation) ? (value as Operation) : null;
+}
+
+function isRequestItem(value: unknown, operation: Operation): boolean {
   if (typeof value !== 'object' || value === null) return false;
   const item = value as Record<string, unknown>;
+  if (operation === 'extract') return false;
   if (typeof item.inputPath !== 'string' || item.inputPath.length === 0) return false;
   if (formatFromValue(item.targetFormat) === null) return false;
   if (qualityFromValue(item.quality) === null) return false;
-  if (item.compression !== undefined && !isValidCompressionOptions(item.compression)) return false;
+  if (operation === 'compress') {
+    if (item.compression === undefined || !isValidCompressionOptions(item.compression)) return false;
+  } else if (item.compression !== undefined) {
+    return false;
+  }
   return true;
 }
 
 function isStartRequest(value: unknown): value is StartConversionRequest {
   if (typeof value !== 'object' || value === null) return false;
   const req = value as Record<string, unknown>;
+  const operation = operationFromValue(req.operation);
+  if (operation === null || operation === 'extract') return false;
   if (!Array.isArray(req.items) || req.items.length === 0) return false;
-  if (!req.items.every(isRequestItem)) return false;
+  if (!req.items.every((item) => isRequestItem(item, operation))) return false;
   const destination = req.destination;
   return destination === null || (typeof destination === 'string' && destination.length > 0);
 }

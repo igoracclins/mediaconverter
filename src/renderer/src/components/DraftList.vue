@@ -2,54 +2,27 @@
 import { computed } from 'vue';
 import { FORMATS_BY_CATEGORY } from '@shared/formats';
 import type { MediaCategory, TargetFormat } from '@shared/types';
-import type { DraftItem } from '../types';
+import type { ConvertDraft } from '../types';
+import {
+  CATEGORY_LABELS,
+  CATEGORY_PLURAL,
+  CATEGORY_SINGULAR,
+  countLabel,
+  groupByCategory,
+} from '../grouping';
 
 const props = defineProps<{
-  items: DraftItem[];
+  items: ConvertDraft[];
   formats: Record<MediaCategory, TargetFormat>;
   converting: boolean;
 }>();
 const emit = defineEmits<{
-  remove: [index: number];
+  remove: [id: string];
   setFormat: [category: MediaCategory, format: TargetFormat];
   convert: [category: MediaCategory];
 }>();
 
-const CATEGORY_ORDER: MediaCategory[] = ['video', 'audio', 'image'];
-
-const CATEGORY_LABELS: Record<MediaCategory, string> = {
-  video: 'Vídeos',
-  audio: 'Áudios',
-  image: 'Imagens',
-};
-
-const CATEGORY_SINGULAR: Record<MediaCategory, string> = {
-  video: 'vídeo',
-  audio: 'áudio',
-  image: 'imagem',
-};
-
-const CATEGORY_PLURAL: Record<MediaCategory, string> = {
-  video: 'vídeos',
-  audio: 'áudios',
-  image: 'imagens',
-};
-
-const groups = computed<
-  { category: MediaCategory; entries: { item: DraftItem; index: number }[] }[]
->(() => {
-  return CATEGORY_ORDER.map((category) => {
-    const entries: { item: DraftItem; index: number }[] = [];
-    props.items.forEach((item, index) => {
-      if (item.category === category) entries.push({ item, index });
-    });
-    return { category, entries };
-  }).filter((group) => group.entries.length > 0);
-});
-
-function countLabel(count: number): string {
-  return `${count} ${count === 1 ? 'arquivo' : 'arquivos'}`;
-}
+const groups = computed(() => groupByCategory(props.items));
 
 function actionLabel(category: MediaCategory, count: number): string {
   const noun = count === 1 ? CATEGORY_SINGULAR[category] : CATEGORY_PLURAL[category];
@@ -111,7 +84,7 @@ function actionLabel(category: MediaCategory, count: number): string {
       <ul class="divide-y divide-edge overflow-hidden rounded-xl border border-edge bg-surface-alt">
         <li
           v-for="entry in group.entries"
-          :key="`${entry.item.path}:${entry.index}`"
+          :key="entry.item.id"
           class="flex items-center gap-3 px-4 py-2.5"
         >
           <span
@@ -128,7 +101,7 @@ function actionLabel(category: MediaCategory, count: number): string {
             type="button"
             class="shrink-0 rounded-md px-2 py-1 text-sm text-ink-dim transition-colors hover:bg-surface-raised hover:text-danger"
             :title="`Remover ${entry.item.name}`"
-            @click="emit('remove', entry.index)"
+            @click="emit('remove', entry.item.id)"
           >
             ✕
           </button>

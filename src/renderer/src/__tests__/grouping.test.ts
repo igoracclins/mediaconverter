@@ -78,6 +78,12 @@ const MIXED: AddFilesResult = {
   rejected: [],
 };
 
+async function pickOperation(wrapper: VueWrapper, label: string): Promise<void> {
+  const button = wrapper.findAll('button').find((b) => b.text().includes(label))!;
+  await button.trigger('click');
+  await flushPromises();
+}
+
 async function addDraft(wrapper: VueWrapper, draft: AddFilesResult = MIXED): Promise<void> {
   apiMock.openFiles.mockResolvedValue({ cancelled: false, files: draft.files });
   apiMock.inspectFiles.mockResolvedValue(draft);
@@ -115,6 +121,7 @@ describe('category grouping', () => {
   it('shows only non-empty category groups with the right headers', async () => {
     const wrapper = mount(App);
     await flushPromises();
+    await pickOperation(wrapper, 'Conversão');
     await addDraft(wrapper);
 
     expect(sectionHeaders(wrapper)).toContain('Vídeos');
@@ -128,6 +135,7 @@ describe('category grouping', () => {
   it('places each file in its correct category group', async () => {
     const wrapper = mount(App);
     await flushPromises();
+    await pickOperation(wrapper, 'Conversão');
     await addDraft(wrapper);
 
     const groups = wrapper.findComponent(DraftList).findAll('div.mb-5');
@@ -149,6 +157,7 @@ describe('category grouping', () => {
   it('hides empty categories', async () => {
     const wrapper = mount(App);
     await flushPromises();
+    await pickOperation(wrapper, 'Conversão');
     await addDraft(wrapper, {
       files: [
         {
@@ -172,6 +181,7 @@ describe('category grouping', () => {
   it('keeps mixed-category files selectable together and converts only the chosen category', async () => {
     const wrapper = mount(App);
     await flushPromises();
+    await pickOperation(wrapper, 'Conversão');
     await addDraft(wrapper);
 
     expect(wrapper.text()).toContain('Prontos para converter');
@@ -188,6 +198,7 @@ describe('category grouping', () => {
     const calls = apiMock.startConversion.mock.calls;
     expect(calls).toHaveLength(1);
     const request = calls[0]![0];
+    expect(request.operation).toBe('convert');
     expect(request.items).toHaveLength(1);
     expect(request.items[0]!.inputPath).toBe('/m/video.mp4');
     expect(request.items[0]!.targetFormat).toBe('mp4');
@@ -198,6 +209,7 @@ describe('category grouping', () => {
   it('removes an individual file across categories', async () => {
     const wrapper = mount(App);
     await flushPromises();
+    await pickOperation(wrapper, 'Conversão');
     await addDraft(wrapper);
 
     const removeButtons = childOfList(wrapper, 'button[title]').filter((b) =>
@@ -219,6 +231,7 @@ describe('category grouping', () => {
   it('“Remover todos” clears every category group', async () => {
     const wrapper = mount(App);
     await flushPromises();
+    await pickOperation(wrapper, 'Conversão');
     await addDraft(wrapper);
 
     const removeAll = wrapper.findAll('button').find((b) => b.text().trim() === 'Remover todos')!;
@@ -236,6 +249,7 @@ describe('category grouping', () => {
   it('each category gets its own conversion format', async () => {
     const wrapper = mount(App);
     await flushPromises();
+    await pickOperation(wrapper, 'Conversão');
     await addDraft(wrapper);
 
     expect((wrapper.find('#convert-format-video').element as HTMLSelectElement).value).toBe('mp4');
@@ -262,10 +276,9 @@ describe('category grouping', () => {
     vi.useFakeTimers();
     const wrapper = mount(App);
     await flushPromises();
+    await pickOperation(wrapper, 'Compressão');
     await addDraft(wrapper);
 
-    const compressTab = wrapper.findAll('button').find((b) => b.text().trim() === 'Compressão')!;
-    await compressTab.trigger('click');
     await vi.advanceTimersByTimeAsync(400);
     await vi.advanceTimersByTimeAsync(400);
     await flushPromises();

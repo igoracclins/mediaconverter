@@ -75,6 +75,7 @@ describe.skipIf(!ffmpegReady)('ConversionManager (real pipeline)', () => {
     const { snapshots } = snapshotOf(manager);
 
     const result = manager.start({
+      operation: 'convert',
       items: [
         { inputPath: path.join(workDir, 'a.wav'), targetFormat: 'mp3', quality: 'high' },
         { inputPath: path.join(workDir, 'b.wav'), targetFormat: 'ogg', quality: 'medium' },
@@ -114,6 +115,7 @@ describe.skipIf(!ffmpegReady)('ConversionManager (real pipeline)', () => {
     const manager = new ConversionManager({ bundle, ffprobeBin, concurrency: 1 });
     snapshotOf(manager);
     const result = manager.start({
+      operation: 'compress',
       items: [
         {
           inputPath: input,
@@ -170,6 +172,7 @@ describe.skipIf(!ffmpegReady)('ConversionManager (real pipeline)', () => {
     const manager = new ConversionManager({ bundle, ffprobeBin, concurrency: 1 });
     snapshotOf(manager);
     const result = manager.start({
+      operation: 'convert',
       items: [{ inputPath: longVideo, targetFormat: 'mkv', quality: 'low' }],
       destination: null,
     });
