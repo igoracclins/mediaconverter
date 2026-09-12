@@ -5,6 +5,7 @@ import type { CreateJobInput } from '../job';
 function job(id: string): CreateJobInput {
   return {
     id,
+    operation: 'convert',
     name: `${id}.ogg`,
     sourceExtension: 'ogg',
     category: 'audio',

@@ -66,6 +66,12 @@ describe('resolveOutputPath', () => {
     );
   });
 
+  it('uses an Extraidos folder for extracted audio when dest is null', () => {
+    expect(resolveOutputPath('/mnt/media/clip.mp4', 'mp3', null, 'Extraidos')).toBe(
+      '/mnt/media/Extraidos/clip.mp3',
+    );
+  });
+
   it('uses the given destination directory', () => {
     expect(resolveOutputPath('/mnt/media/audio.ogg', 'mp3', '/out')).toBe('/out/audio.mp3');
   });

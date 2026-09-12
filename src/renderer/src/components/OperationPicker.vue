@@ -14,6 +14,11 @@ const OPTIONS: { operation: Operation; title: string; description: string }[] = 
     title: 'Compressão',
     description: 'Reduzir o tamanho de arquivos mantendo o formato original.',
   },
+  {
+    operation: 'extract',
+    title: 'Extração de áudio',
+    description: 'Extrair apenas a faixa de áudio de vídeos, como MP3, M4A ou WAV.',
+  },
 ];
 </script>
 

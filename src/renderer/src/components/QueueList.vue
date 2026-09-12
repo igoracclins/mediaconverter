@@ -15,7 +15,12 @@ const statusStyles: Record<string, string> = {
 function label(job: JobSnapshot): string {
   const labels: Record<string, string> = {
     pending: 'Pendente',
-    processing: job.compression ? 'Comprimindo…' : 'Convertendo…',
+    processing:
+      job.compression
+        ? 'Comprimindo…'
+        : job.operation === 'extract'
+          ? 'Extraindo…'
+          : 'Convertendo…',
     completed: 'Concluído',
     failed: 'Falhou',
     cancelled: 'Cancelado',

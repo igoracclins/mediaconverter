@@ -20,6 +20,9 @@ export interface ConversionTask {
     maxSizeMb: number;
     encode: CompressionEncode;
   };
+  extraction?: {
+    streamCopy: boolean;
+  };
 }
 
 export interface EngineRunResult {

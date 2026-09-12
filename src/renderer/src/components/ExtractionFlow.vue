@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import DropZone from './DropZone.vue';
-import DraftList from './DraftList.vue';
-import { useConversionStore, type BannerMessage } from '../flows/useConversionStore';
-import type { MediaCategory, Operation } from '@shared/types';
+import type { Operation } from '@shared/types';
 import { userMessage } from '@shared/errors';
+import DropZone from './DropZone.vue';
+import ExtractionDraftList from './ExtractionDraftList.vue';
+import { useExtractionStore, type BannerMessage } from '../flows/useExtractionStore';
 
 const emit = defineEmits<{
   banner: [message: BannerMessage];
@@ -11,20 +11,19 @@ const emit = defineEmits<{
   completion: [operation: Operation];
 }>();
 
-const store = useConversionStore();
-const { drafts, converting, formatsByCategory, removeAllDrafts, removeDraft, setCategoryFormat } =
-  store;
+const store = useExtractionStore();
+const { drafts, converting, targetFormat, removeAllDrafts, removeDraft, setTargetFormat } = store;
 
 async function onAdded(paths: string[]): Promise<void> {
   const message = await store.addFiles(paths);
   if (message) emit('banner', message);
 }
 
-async function onConvert(category: MediaCategory): Promise<void> {
-  const result = await store.submitCategory(category, () => emit('submitStart'));
+async function onExtract(): Promise<void> {
+  const result = await store.submit(() => emit('submitStart'));
   if (result === null) return;
   if (result.ok) {
-    emit('completion', 'convert');
+    emit('completion', 'extract');
   } else {
     emit('banner', { kind: 'error', text: userMessage(result.error) });
   }
@@ -33,9 +32,12 @@ async function onConvert(category: MediaCategory): Promise<void> {
 
 <template>
   <section class="flex flex-col gap-4">
-    <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-dim">Conversão</h2>
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-dim">Extração de áudio</h2>
 
-    <DropZone @added="onAdded" />
+    <DropZone
+      hint="Vídeos de qualquer tamanho. Apenas a faixa de áudio será extraída, sempre na pasta Extraidos, nada sai do seu dispositivo."
+      @added="onAdded"
+    />
 
     <div v-if="drafts.length > 0" class="flex flex-col gap-4">
       <div class="flex justify-end">
@@ -47,13 +49,13 @@ async function onConvert(category: MediaCategory): Promise<void> {
           Remover todos
         </button>
       </div>
-      <DraftList
+      <ExtractionDraftList
         :items="drafts"
-        :formats="formatsByCategory"
+        :target-format="targetFormat"
         :converting="converting"
         @remove="removeDraft"
-        @set-format="setCategoryFormat"
-        @convert="onConvert"
+        @set-format="setTargetFormat"
+        @extract="onExtract"
       />
     </div>
     <p v-else class="text-center text-xs text-ink-dim">Nenhum arquivo adicionado ainda.</p>

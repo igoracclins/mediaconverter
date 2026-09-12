@@ -34,6 +34,50 @@ function makeWav(ffmpeg: string, dir: string, file: string, freq: string, durati
   ]);
 }
 
+function makeVideoWithAudio(ffmpeg: string, dir: string, file: string): boolean {
+  return run(ffmpeg, dir, [
+    '-loglevel',
+    'error',
+    '-f',
+    'lavfi',
+    '-i',
+    'testsrc=duration=2:size=320x240:rate=15',
+    '-f',
+    'lavfi',
+    '-i',
+    'sine=frequency=440:duration=2',
+    '-c:v',
+    'libx264',
+    '-preset',
+    'ultrafast',
+    '-pix_fmt',
+    'yuv420p',
+    '-c:a',
+    'aac',
+    '-shortest',
+    file,
+  ]);
+}
+
+function makeVideoWithoutAudio(ffmpeg: string, dir: string, file: string): boolean {
+  return run(ffmpeg, dir, [
+    '-loglevel',
+    'error',
+    '-f',
+    'lavfi',
+    '-i',
+    'testsrc=duration=2:size=320x240:rate=15',
+    '-an',
+    '-c:v',
+    'libx264',
+    '-preset',
+    'ultrafast',
+    '-pix_fmt',
+    'yuv420p',
+    file,
+  ]);
+}
+
 function waitFor(predicate: () => boolean, timeoutMs = 30_000, intervalMs = 60): Promise<void> {
   return new Promise((resolve, reject) => {
     const started = Date.now();
@@ -149,6 +193,64 @@ describe.skipIf(!ffmpegReady)('ConversionManager (real pipeline)', () => {
     expect(outSize).toBeGreaterThan(0);
     expect(outSize).toBeLessThan(inSize);
     expect(outSize).toBeLessThanOrEqual(0.2 * 1024 * 1024);
+  });
+
+  it('extracts a video audio track into the Extraidos folder via stream copy', async () => {
+    const input = path.join(workDir, 'clip.mov');
+    expect(makeVideoWithAudio(ffmpegBin, workDir, input)).toBe(true);
+
+    const manager = new ConversionManager({ bundle, ffprobeBin, concurrency: 1 });
+    snapshotOf(manager);
+    const result = manager.start({
+      operation: 'extract',
+      items: [{ inputPath: input, targetFormat: 'm4a', quality: 'high' }],
+      destination: null,
+    });
+    expect(result.created).toBe(1);
+    expect(result.rejected).toEqual([]);
+
+    await waitFor(() => {
+      const jobs = manager.snapshot().jobs;
+      return (
+        jobs.length > 0 &&
+        jobs.every((j) => ['completed', 'failed', 'cancelled'].includes(j.status))
+      );
+    });
+
+    const final = manager.snapshot();
+    const job = final.jobs[0]!;
+    expect(job.status).toBe('completed');
+    expect(job.outputPath!).toContain('Extraidos');
+    expect(job.outputPath!.endsWith('.m4a')).toBe(true);
+    expect(existsSync(job.outputPath!)).toBe(true);
+  });
+
+  it('fails with NO_AUDIO_STREAM when the video has no audio track', async () => {
+    const input = path.join(workDir, 'silent.mp4');
+    expect(makeVideoWithoutAudio(ffmpegBin, workDir, input)).toBe(true);
+
+    const manager = new ConversionManager({ bundle, ffprobeBin, concurrency: 1 });
+    snapshotOf(manager);
+    manager.start({
+      operation: 'extract',
+      items: [{ inputPath: input, targetFormat: 'mp3', quality: 'high' }],
+      destination: null,
+    });
+
+    await waitFor(() => {
+      const jobs = manager.snapshot().jobs;
+      return (
+        jobs.length > 0 &&
+        jobs.every((j) => ['completed', 'failed', 'cancelled'].includes(j.status))
+      );
+    });
+
+    const final = manager.snapshot();
+    const job = final.jobs[0]!;
+    expect(job.status).toBe('failed');
+    expect(job.errorCode).toBe('NO_AUDIO_STREAM');
+    expect(job.errorMessage).toContain('não possui uma faixa de áudio');
+    expect(existsSync(job.outputPath!)).toBe(false);
   });
 
   it('cancels a running job, removes partial output, and reports JOB_CANCELLED', async () => {

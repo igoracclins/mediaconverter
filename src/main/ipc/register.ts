@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { isValidCompressionOptions, parseTargetSizeMb } from '@conversion/compress';
 import { formatFromValue, qualityFromValue } from '@shared/formats';
+import { AUDIO_TARGET_FORMATS, type Operation } from '@shared/types';
 import {
   IPC,
   type CompressionEstimateRequest,
@@ -13,7 +14,6 @@ import { getAppInfo } from '../services/app-info';
 import { estimateCompression } from '../services/compression-estimate';
 import { inspectFiles, openFilesDialog } from '../services/file-service';
 import type { ConversionManager } from '../services/conversion-manager';
-import type { Operation } from '@shared/types';
 import { logger } from '../logger';
 
 export interface IpcDependencies {
@@ -32,10 +32,14 @@ function operationFromValue(value: unknown): Operation | null {
 function isRequestItem(value: unknown, operation: Operation): boolean {
   if (typeof value !== 'object' || value === null) return false;
   const item = value as Record<string, unknown>;
-  if (operation === 'extract') return false;
   if (typeof item.inputPath !== 'string' || item.inputPath.length === 0) return false;
-  if (formatFromValue(item.targetFormat) === null) return false;
+  const target = formatFromValue(item.targetFormat);
+  if (target === null) return false;
   if (qualityFromValue(item.quality) === null) return false;
+  if (operation === 'extract') {
+    if (item.compression !== undefined) return false;
+    return (AUDIO_TARGET_FORMATS as readonly string[]).includes(target);
+  }
   if (operation === 'compress') {
     if (item.compression === undefined || !isValidCompressionOptions(item.compression)) return false;
   } else if (item.compression !== undefined) {
@@ -48,7 +52,7 @@ function isStartRequest(value: unknown): value is StartConversionRequest {
   if (typeof value !== 'object' || value === null) return false;
   const req = value as Record<string, unknown>;
   const operation = operationFromValue(req.operation);
-  if (operation === null || operation === 'extract') return false;
+  if (operation === null) return false;
   if (!Array.isArray(req.items) || req.items.length === 0) return false;
   if (!req.items.every((item) => isRequestItem(item, operation))) return false;
   const destination = req.destination;

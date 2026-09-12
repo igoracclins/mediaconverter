@@ -3,6 +3,7 @@ import { ref, watch } from 'vue';
 import OperationPicker from './components/OperationPicker.vue';
 import ConversionFlow from './components/ConversionFlow.vue';
 import CompressionFlow from './components/CompressionFlow.vue';
+import ExtractionFlow from './components/ExtractionFlow.vue';
 import QueueList from './components/QueueList.vue';
 import { useQueue } from './composables/useQueue';
 import type { Operation } from '@shared/types';
@@ -14,7 +15,16 @@ const banner = ref<{ kind: 'error' | 'info'; text: string } | null>(null);
 
 const beforeIds = new Set<string>();
 const batchIds = new Set<string>();
-const completion = ref<{ hadIncompatible: boolean; compressed: boolean } | null>(null);
+const completion = ref<{ hadIncompatible: boolean; operation: Operation } | null>(null);
+
+const SUCCESS_MESSAGES: Record<Operation, string> = {
+  convert:
+    'Arquivos convertidos com sucesso. Os arquivos estão na pasta Convertidos, junto aos arquivos originais.',
+  compress:
+    'Arquivos comprimidos com sucesso. Os arquivos estão na pasta Comprimidos, junto aos arquivos originais.',
+  extract:
+    'Áudio extraído com sucesso. Os arquivos estão na pasta Extraidos, junto aos arquivos originais.',
+};
 
 function hasTerminalJobs(): boolean {
   return jobs.value.some((job) => ['completed', 'failed', 'cancelled'].includes(job.status));
@@ -46,8 +56,8 @@ function onSubmitStart(): void {
   for (const job of jobs.value) beforeIds.add(job.id);
 }
 
-function onCompletion(compressed: boolean): void {
-  completion.value = { hadIncompatible: false, compressed };
+function onCompletion(operation: Operation): void {
+  completion.value = { hadIncompatible: false, operation };
 }
 
 watch(
@@ -72,17 +82,12 @@ watch(
     if (hasActive) return;
     const anyCompleted = relevant.some((job) => job.status === 'completed');
     const anyFailed = relevant.some((job) => job.status === 'failed' || job.status === 'cancelled');
-    const { hadIncompatible, compressed } = completion.value;
+    const { hadIncompatible, operation: completedOperation } = completion.value;
     completion.value = null;
     beforeIds.clear();
     batchIds.clear();
     if (anyCompleted && !anyFailed && !hadIncompatible) {
-      banner.value = {
-        kind: 'info',
-        text: compressed
-          ? 'Arquivos comprimidos com sucesso. Os arquivos estão na pasta Comprimidos, junto aos arquivos originais.'
-          : 'Arquivos convertidos com sucesso. Os arquivos estão na pasta Convertidos, junto aos arquivos originais.',
-      };
+      banner.value = { kind: 'info', text: SUCCESS_MESSAGES[completedOperation] };
     }
   },
   { deep: true },
@@ -133,6 +138,12 @@ watch(
         @completion="onCompletion"
       />
       <CompressionFlow
+        v-else-if="operation === 'compress'"
+        @banner="onBanner"
+        @submit-start="onSubmitStart"
+        @completion="onCompletion"
+      />
+      <ExtractionFlow
         v-else
         @banner="onBanner"
         @submit-start="onSubmitStart"

@@ -9,9 +9,10 @@ import {
 } from '@conversion/compress';
 import type { ConversionTask, EngineBundle } from '@conversion/engine';
 import { probeMedia } from '@conversion/ffmpeg/probe';
+import { canStreamCopyAudio } from '@conversion/ffmpeg/args';
 import { ConversionService } from '@conversion/service';
 import { detectPath } from '@core/detect';
-import { COMPRESSED_DIR, CONVERTED_DIR } from '@core/filenames';
+import { COMPRESSED_DIR, CONVERTED_DIR, EXTRACTED_DIR } from '@core/filenames';
 import type { InternalJob } from '@core/job';
 import { complete, fail, setProgress, start, cancel } from '@core/job';
 import { JobQueue } from '@core/queue';
@@ -22,13 +23,20 @@ import type {
   ConversionRequestItem,
   CompressionOptions,
 } from '@shared/ipc';
-import type { AppErrorCode, MediaCategory, Operation, TargetFormat } from '@shared/types';
+import type { AppErrorCode, AudioTargetFormat, MediaCategory, Operation, TargetFormat } from '@shared/types';
 import { logger } from '../logger';
 import { resolveAndReserveOutput, validateInput } from './output-resolver';
 
 const MAX_COMPRESSION_ATTEMPTS = 6;
 const RETRY_BUDGET_RATIO = 0.82;
 const RETRY_SAFETY_RATIO = 0.9;
+
+type RunResult = {
+  ok: boolean;
+  cancelled: boolean;
+  code: AppErrorCode | null;
+  message: string | null;
+};
 
 export interface StartResult {
   created: number;
@@ -181,17 +189,17 @@ export class ConversionManager {
     destination: string | null,
     operation: Operation,
   ): { ok: true } | { ok: false; error: AppErrorCode } {
-    if (operation === 'extract') {
-      return { ok: false, error: 'INVALID_REQUEST' };
-    }
     const detected = detectPath(item.inputPath);
     if (!detected) {
       return { ok: false, error: 'UNSUPPORTED_SOURCE' };
     }
     const isCompression = operation === 'compress';
-    const category = isCompression
-      ? detected.category
-      : categoryOf(item.targetFormat);
+    const isExtraction = operation === 'extract';
+    const category: MediaCategory = isExtraction
+      ? 'audio'
+      : isCompression
+        ? detected.category
+        : categoryOf(item.targetFormat);
     if (!FORMATS_BY_CATEGORY[category].some((f) => f.id === item.targetFormat)) {
       return { ok: false, error: 'INVALID_REQUEST' };
     }
@@ -199,12 +207,18 @@ export class ConversionManager {
       if (item.compression === undefined || !isValidCompressionOptions(item.compression)) {
         return { ok: false, error: 'INVALID_REQUEST' };
       }
+    } else if (isExtraction && detected.category !== 'video') {
+      return { ok: false, error: 'INVALID_REQUEST' };
     }
     const inputValid = validateInput(item.inputPath);
     if (!inputValid.ok) return { ok: false, error: inputValid.error };
 
     const name = inputFileName(item.inputPath);
-    const outputsDir = isCompression ? COMPRESSED_DIR : CONVERTED_DIR;
+    const outputsDir = isCompression
+      ? COMPRESSED_DIR
+      : isExtraction
+        ? EXTRACTED_DIR
+        : CONVERTED_DIR;
     const reserved = resolveAndReserveOutput(
       item.inputPath,
       item.targetFormat,
@@ -215,6 +229,7 @@ export class ConversionManager {
 
     const job = this.queue.add({
       id: randomUUID(),
+      operation,
       name,
       sourceExtension: detected.extension,
       category,
@@ -241,6 +256,8 @@ export class ConversionManager {
     durationMs: number | null;
     hasVideo: boolean;
     hasAudio: boolean;
+    audioCodecName: string | null;
+    probeOk: boolean;
   }> {
     let sizeBytes = 0;
     try {
@@ -249,7 +266,13 @@ export class ConversionManager {
       sizeBytes = 0;
     }
 
-    let probe = { durationMs: null as number | null, hasVideo: false, hasAudio: false };
+    let probe = {
+      durationMs: null as number | null,
+      hasVideo: false,
+      hasAudio: false,
+      audioCodecName: null as string | null,
+      probeOk: true,
+    };
     if (job.category !== 'image') {
       probe = await probeMedia(this.ffprobeBin, job.inputPath);
     }
@@ -363,18 +386,62 @@ export class ConversionManager {
     return budget * ratio * RETRY_SAFETY_RATIO;
   }
 
-  private async copyToOutput(task: ConversionTask): Promise<{
-    code: AppErrorCode | null;
-    message: string | null;
-    ok: boolean;
-  }> {
+  private async copyToOutput(task: ConversionTask): Promise<RunResult> {
     try {
       await copyFile(task.inputPath, task.outputPath, fsConstants.COPYFILE_EXCL);
-      return { code: null, message: null, ok: true };
+      return { code: null, message: null, ok: true, cancelled: false };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      return { code: 'ENCODE_FAILED', message, ok: false };
+      return { code: 'ENCODE_FAILED', message, ok: false, cancelled: false };
     }
+  }
+
+  private async executeTask(task: ConversionTask, job: InternalJob): Promise<RunResult> {
+    const handle = this.service.execute(task, (value) => {
+      const current = this.queue.get(task.id);
+      if (current) this.queue.replace(setProgress(current, value));
+      this.broadcast();
+    });
+    this.cancelHandlers.set(task.id, () => handle.cancel());
+    const res = await handle.finished;
+    this.cancelHandlers.delete(task.id);
+    if (res.ok) return { ok: true, cancelled: false, code: null, message: null };
+    if (res.errorCode === 'JOB_CANCELLED') {
+      return { ok: false, cancelled: true, code: 'JOB_CANCELLED', message: null };
+    }
+    return {
+      ok: false,
+      cancelled: false,
+      code: res.errorCode ?? 'ENCODE_FAILED',
+      message: res.errorMessage,
+    };
+  }
+
+  private async runExtraction(task: ConversionTask, job: InternalJob): Promise<RunResult> {
+    const probe = await this.probeTask(job);
+    task.durationMs = probe.durationMs;
+
+    if (!probe.probeOk) {
+      return {
+        ok: false,
+        cancelled: false,
+        code: 'ENCODE_FAILED',
+        message: 'Não foi possível ler as informações deste vídeo.',
+      };
+    }
+    if (!probe.hasAudio) {
+      return {
+        ok: false,
+        cancelled: false,
+        code: 'NO_AUDIO_STREAM',
+        message: 'Este vídeo não possui uma faixa de áudio para extrair.',
+      };
+    }
+
+    task.extraction = {
+      streamCopy: canStreamCopyAudio(task.targetFormat as AudioTargetFormat, probe.audioCodecName),
+    };
+    return this.executeTask(task, job);
   }
 
   private async run(job: InternalJob): Promise<void> {
@@ -387,27 +454,16 @@ export class ConversionManager {
 
     const task = makeTask(started, undefined);
 
-    let result: { code: AppErrorCode | null; message: string | null; ok: boolean };
+    let result: RunResult;
 
     if (started.compression) {
       result = await this.runCompression(task, started);
+    } else if (started.operation === 'extract') {
+      result = await this.runExtraction(task, started);
     } else if (started.sourceExtension === started.targetFormat) {
       result = await this.copyToOutput(task);
     } else {
-      const handle = this.service.execute(task, (value) => {
-        const current = this.queue.get(task.id);
-        if (current) this.queue.replace(setProgress(current, value));
-        this.broadcast();
-      });
-      this.cancelHandlers.set(task.id, () => handle.cancel());
-      const res = await handle.finished;
-      this.cancelHandlers.delete(task.id);
-      if (res.ok) result = { code: null, message: null, ok: true };
-      else if (res.errorCode === 'JOB_CANCELLED') {
-        result = { code: 'JOB_CANCELLED', message: null, ok: false };
-      } else {
-        result = { code: res.errorCode ?? 'ENCODE_FAILED', message: res.errorMessage, ok: false };
-      }
+      result = await this.executeTask(task, started);
     }
 
     const current = this.queue.get(started.id);

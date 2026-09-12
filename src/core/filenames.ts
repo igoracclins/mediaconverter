@@ -8,6 +8,7 @@ export const DEFAULT_MAX_ATTEMPTS = 10_000;
 
 export const CONVERTED_DIR = 'Convertidos';
 export const COMPRESSED_DIR = 'Comprimidos';
+export const EXTRACTED_DIR = 'Extraidos';
 
 export function sanitizeBaseName(base: string): string {
   let cleaned = base.replace(WINDOWS_RESERVED, '').trim();

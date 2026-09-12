@@ -3,12 +3,14 @@ import type {
   AppErrorCode,
   JobStatus,
   MediaCategory,
+  Operation,
   QualityPreset,
   TargetFormat,
 } from '@shared/types';
 
 export interface CreateJobInput {
   id: string;
+  operation: Operation;
   name: string;
   sourceExtension: string;
   category: MediaCategory;
@@ -20,6 +22,7 @@ export interface CreateJobInput {
 
 export interface InternalJob {
   id: string;
+  operation: Operation;
   name: string;
   sourceExtension: string;
   category: MediaCategory;
@@ -48,6 +51,7 @@ export const VALID_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
 export function createJob(input: CreateJobInput, now: number = Date.now()): InternalJob {
   return {
     id: input.id,
+    operation: input.operation,
     name: input.name,
     sourceExtension: input.sourceExtension,
     category: input.category,
@@ -112,6 +116,7 @@ export function setProgress(job: InternalJob, progress: number | null): Internal
 export function snapshot(job: InternalJob): JobSnapshot {
   return {
     id: job.id,
+    operation: job.operation,
     name: job.name,
     sourceExtension: job.sourceExtension,
     category: job.category,

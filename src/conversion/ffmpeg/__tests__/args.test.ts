@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildFfmpegArgs } from '../args';
+import { buildFfmpegArgs, canStreamCopyAudio } from '../args';
 import type { ConversionTask } from '../../engine';
 import type { CompressionEncode } from '../../compress';
 
@@ -89,6 +89,77 @@ describe('buildFfmpegArgs', () => {
     } as ConversionTask);
     expect(args).toContain('libvpx-vp9');
     expect(args).toContain('libopus');
+  });
+});
+
+describe('buildFfmpegArgs (extraction)', () => {
+  const withExtraction = (
+    targetFormat: string,
+    streamCopy: boolean,
+    outputPath = '/tmp/My Song.mp3',
+  ): ConversionTask =>
+    ({
+      ...base,
+      category: 'audio',
+      targetFormat,
+      outputPath,
+      extraction: { streamCopy },
+    }) as unknown as ConversionTask;
+
+  it('stream-copies the audio track without touching video', () => {
+    const args = buildFfmpegArgs(withExtraction('m4a', true, '/tmp/My Song.m4a'));
+    expect(args).toContain('-vn');
+    expect(args).toContain('-sn');
+    expect(args).toContain('-c:a');
+    expect(args).toContain('copy');
+    expect(args).toContain('-n');
+    expect(args).not.toContain('aac');
+    expect(args).not.toContain('256k');
+  });
+
+  it('re-encodes audio with the high profile when copy is not possible', () => {
+    const args = buildFfmpegArgs(withExtraction('mp3', false));
+    expect(args).toContain('-vn');
+    expect(args).toContain('-c:a');
+    expect(args).toContain('libmp3lame');
+    expect(args).toContain('320k');
+    expect(args).not.toContain('copy');
+  });
+
+  it('re-encodes m4a with aac + faststart when copy is not possible', () => {
+    const args = buildFfmpegArgs(withExtraction('m4a', false, '/tmp/My Song.m4a'));
+    expect(args).toContain('aac');
+    expect(args).toContain('256k');
+    expect(args).toContain('+faststart');
+  });
+
+  it('places output flags after the input url', () => {
+    const args = buildFfmpegArgs(withExtraction('mp3', false));
+    const inputIndex = args.indexOf('-i');
+    for (const opt of ['-map_metadata', '-n', '-vn']) {
+      expect(args.indexOf(opt)).toBeGreaterThan(inputIndex);
+    }
+  });
+});
+
+describe('canStreamCopyAudio', () => {
+  it('allows compatible codec/container pairs', () => {
+    expect(canStreamCopyAudio('m4a', 'aac')).toBe(true);
+    expect(canStreamCopyAudio('m4a', 'alac')).toBe(true);
+    expect(canStreamCopyAudio('mp3', 'mp3')).toBe(true);
+    expect(canStreamCopyAudio('ogg', 'opus')).toBe(true);
+    expect(canStreamCopyAudio('ogg', 'vorbis')).toBe(true);
+    expect(canStreamCopyAudio('wav', 'pcm_s16le')).toBe(true);
+    expect(canStreamCopyAudio('flac', 'flac')).toBe(true);
+  });
+
+  it('rejects incompatible or unknown codecs', () => {
+    expect(canStreamCopyAudio('m4a', 'mp3')).toBe(false);
+    expect(canStreamCopyAudio('m4a', null)).toBe(false);
+    expect(canStreamCopyAudio('ogg', 'aac')).toBe(false);
+    expect(canStreamCopyAudio('mp3', 'aac')).toBe(false);
+    expect(canStreamCopyAudio('wav', 'aac')).toBe(false);
+    expect(canStreamCopyAudio('mp3', 'not-a-codec')).toBe(false);
   });
 });
 

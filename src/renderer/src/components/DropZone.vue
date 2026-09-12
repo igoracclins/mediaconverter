@@ -1,6 +1,16 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
+const props = withDefaults(
+  defineProps<{
+    hint?: string;
+  }>(),
+  {
+    hint:
+      'Áudio, vídeo e imagens de qualquer tamanho, convertido localmente, nada sai do seu dispositivo.',
+  },
+);
+
 const emit = defineEmits<{ added: [paths: string[]] }>();
 const dragging = ref(false);
 
@@ -60,9 +70,6 @@ function pickFiles(): void {
     <span class="text-sm font-medium text-ink"
       >Arraste arquivos de mídia aqui ou clique para procurar</span
     >
-    <span class="text-xs text-ink-dim"
-      >Áudio, vídeo e imagens de qualquer tamanho, convertido localmente, nada sai do seu
-      dispositivo.</span
-    >
+    <span class="text-xs text-ink-dim">{{ props.hint }}</span>
   </button>
 </template>

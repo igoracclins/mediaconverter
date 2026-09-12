@@ -252,6 +252,7 @@ export const ERROR_MESSAGES: Record<AppErrorCode, string> = {
     'Não foi possível criar um nome de saída exclusivo. O destino pode estar bloqueado.',
   NO_WRITE_PERMISSION: 'O aplicativo não tem permissão para gravar no destino.',
   OUTPUT_NOT_CREATED: 'A conversão terminou, mas o arquivo de saída não foi criado.',
+  NO_AUDIO_STREAM: 'Este vídeo não possui uma faixa de áudio para extrair.',
   ENCODE_FAILED:
     'Não foi possível converter este arquivo. O formato de origem pode não ser suportado ou o arquivo pode estar corrompido.',
   JOB_CANCELLED: 'Conversão cancelada.',

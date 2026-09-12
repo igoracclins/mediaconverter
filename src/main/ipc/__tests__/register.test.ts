@@ -103,12 +103,11 @@ describe('registerIpc', () => {
     expect(managerMock.start).not.toHaveBeenCalled();
   });
 
-  it('rejects start requests with an unknown or unimplemented operation', async () => {
+  it('rejects start requests with an unknown operation', async () => {
     registerIpc(makeDeps());
     const baseItem = { inputPath: '/tmp/a.wav', targetFormat: 'mp3', quality: 'high' };
     const cases: unknown[] = [
       { operation: 'bake', items: [baseItem], destination: null },
-      { operation: 'extract', items: [baseItem], destination: null },
       { items: [baseItem], destination: null },
     ];
     for (const request of cases) {
@@ -120,6 +119,55 @@ describe('registerIpc', () => {
       expect(result.error).toBe('INVALID_REQUEST');
     }
     expect(managerMock.start).not.toHaveBeenCalled();
+  });
+
+  it('rejects extract items with a non-audio target or compression payload', async () => {
+    registerIpc(makeDeps());
+    const cases: unknown[] = [
+      {
+        operation: 'extract',
+        items: [{ inputPath: '/tmp/a.mp4', targetFormat: 'mp4', quality: 'high' }],
+        destination: null,
+      },
+      {
+        operation: 'extract',
+        items: [
+          {
+            inputPath: '/tmp/a.mp4',
+            targetFormat: 'mp3',
+            quality: 'high',
+            compression: { maxSizeMb: 30 },
+          },
+        ],
+        destination: null,
+      },
+      {
+        operation: 'extract',
+        items: [{ inputPath: '/tmp/a.mp4', targetFormat: 'mp3' }],
+        destination: null,
+      },
+    ];
+    for (const request of cases) {
+      const result = (await invoke(IPC.StartConversion, request)) as {
+        ok: boolean;
+        error?: string;
+      };
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe('INVALID_REQUEST');
+    }
+    expect(managerMock.start).not.toHaveBeenCalled();
+  });
+
+  it('forwards a valid extract request', async () => {
+    registerIpc(makeDeps());
+    const request: StartConversionRequest = {
+      operation: 'extract',
+      items: [{ inputPath: '/tmp/a.mp4', targetFormat: 'mp3', quality: 'high' }],
+      destination: null,
+    };
+    const result = (await invoke(IPC.StartConversion, request)) as { ok: boolean; created: number };
+    expect(result.ok).toBe(true);
+    expect(managerMock.start).toHaveBeenCalledWith(request);
   });
 
   it('rejects malformed compression estimate requests', async () => {

@@ -4,6 +4,8 @@ export interface ProbeMedia {
   durationMs: number | null;
   hasVideo: boolean;
   hasAudio: boolean;
+  audioCodecName: string | null;
+  probeOk: boolean;
 }
 
 export function probeDuration(ffprobeBin: string, inputPath: string): Promise<number | null> {
@@ -43,17 +45,20 @@ function parseProbe(json: string): ProbeMedia {
   try {
     const data = JSON.parse(json) as {
       format?: { duration?: string };
-      streams?: { codec_type?: string }[];
+      streams?: { codec_type?: string; codec_name?: string }[];
     };
     const duration = Number(data.format?.duration);
     const streams = data.streams ?? [];
+    const audio = streams.find((s) => s.codec_type === 'audio');
     return {
       durationMs: Number.isFinite(duration) && duration > 0 ? duration * 1000 : null,
       hasVideo: streams.some((s) => s.codec_type === 'video'),
-      hasAudio: streams.some((s) => s.codec_type === 'audio'),
+      hasAudio: audio !== undefined,
+      audioCodecName: audio?.codec_name?.toLowerCase() ?? null,
+      probeOk: true,
     };
   } catch {
-    return { durationMs: null, hasVideo: false, hasAudio: false };
+    return { durationMs: null, hasVideo: false, hasAudio: false, audioCodecName: null, probeOk: true };
   }
 }
 
@@ -66,11 +71,11 @@ export function probeMedia(ffprobeBin: string, inputPath: string): Promise<Probe
       out += chunk.toString('utf8');
     });
     const timeout = setTimeout(() => child.kill('SIGKILL'), 10_000);
-    const settle = (): void => {
+    const settle = (ok: boolean): void => {
       clearTimeout(timeout);
-      resolve(parseProbe(out));
+      resolve(ok ? parseProbe(out) : { ...parseProbe(out), probeOk: false });
     };
-    child.on('close', () => settle());
-    child.on('error', () => settle());
+    child.on('close', (code) => settle(code === 0));
+    child.on('error', () => settle(false));
   });
 }

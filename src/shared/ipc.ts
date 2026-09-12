@@ -48,6 +48,7 @@ export interface StartConversionRequest {
 
 export interface JobSnapshot {
   id: string;
+  operation: Operation;
   name: string;
   sourceExtension: string;
   category: MediaCategory;

@@ -2,13 +2,13 @@
 import DropZone from './DropZone.vue';
 import CompressionDraftList from './CompressionDraftList.vue';
 import { useCompressionStore, type BannerMessage } from '../flows/useCompressionStore';
-import type { MediaCategory } from '@shared/types';
+import type { MediaCategory, Operation } from '@shared/types';
 import { userMessage } from '@shared/errors';
 
 const emit = defineEmits<{
   banner: [message: BannerMessage];
   submitStart: [];
-  completion: [compressed: boolean];
+  completion: [operation: Operation];
 }>();
 
 const store = useCompressionStore();
@@ -23,7 +23,7 @@ async function onCompress(category: MediaCategory): Promise<void> {
   const result = await store.submitCategory(category, () => emit('submitStart'));
   if (result === null) return;
   if (result.ok) {
-    emit('completion', true);
+    emit('completion', 'compress');
   } else {
     emit('banner', { kind: 'error', text: userMessage(result.error) });
   }

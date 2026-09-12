@@ -7,6 +7,33 @@ export interface AudioProfile {
   args: string[];
 }
 
+const EXTRACT_COPY_CODECS: Record<AudioTargetFormat, readonly string[]> = {
+  mp3: ['mp3', 'mp2', 'mp1'],
+  m4a: ['aac', 'alac'],
+  wav: [
+    'pcm_u8',
+    'pcm_s16le',
+    'pcm_s24le',
+    'pcm_s32le',
+    'pcm_f32le',
+    'pcm_f64le',
+    'pcm_mulaw',
+    'pcm_alaw',
+    'pcm_s16be',
+    'pcm_s24be',
+    'pcm_s32be',
+    'pcm_f32be',
+    'pcm_f64be',
+  ],
+  ogg: ['vorbis', 'opus'],
+  flac: ['flac'],
+};
+
+export function canStreamCopyAudio(target: AudioTargetFormat, codecName: string | null): boolean {
+  if (!codecName) return false;
+  return EXTRACT_COPY_CODECS[target].includes(codecName.toLowerCase());
+}
+
 const AUDIO_BITRATES: Record<AudioTargetFormat, Record<QualityPreset, string>> = {
   mp3: { high: '320k', medium: '192k', low: '128k' },
   m4a: { high: '256k', medium: '160k', low: '96k' },
@@ -142,6 +169,39 @@ export function buildFfmpegArgs(task: ConversionTask): string[] {
       '0',
       '-n',
       ...codecArgs,
+      task.outputPath,
+    ];
+  }
+
+  if (task.extraction) {
+    if (task.extraction.streamCopy) {
+      return [
+        ...base,
+        '-i',
+        task.inputPath,
+        '-map_metadata',
+        '0',
+        '-n',
+        '-vn',
+        '-sn',
+        '-c:a',
+        'copy',
+        task.outputPath,
+      ];
+    }
+    const profile = audioProfile(task.targetFormat as AudioTargetFormat, task.quality);
+    return [
+      ...base,
+      '-i',
+      task.inputPath,
+      '-map_metadata',
+      '0',
+      '-n',
+      '-vn',
+      '-sn',
+      '-c:a',
+      profile.codec,
+      ...profile.args,
       task.outputPath,
     ];
   }

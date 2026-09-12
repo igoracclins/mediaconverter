@@ -13,6 +13,7 @@ import type { CreateJobInput } from '../job';
 
 const base: CreateJobInput = {
   id: 'j1',
+  operation: 'convert',
   name: 'song.ogg',
   sourceExtension: 'ogg',
   category: 'audio',
@@ -83,6 +84,7 @@ describe('snapshot', () => {
     const snap = snapshot(job);
     expect(snap).toEqual({
       id: 'j1',
+      operation: 'convert',
       name: 'song.ogg',
       sourceExtension: 'ogg',
       category: 'audio',

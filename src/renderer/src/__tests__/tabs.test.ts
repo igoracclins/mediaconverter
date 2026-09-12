@@ -394,3 +394,81 @@ describe('Compressão individual por arquivo', () => {
     wrapper.unmount();
   });
 });
+
+describe('Extração de áudio', () => {
+  beforeEach(installApi);
+  afterEach(() => vi.useRealTimers());
+
+  const DRAFT_VIDEO: AddFilesResult = {
+    files: [
+      {
+        path: '/tmp/clip.mp4',
+        name: 'clip.mp4',
+        extension: 'mp4',
+        category: 'video',
+        sizeBytes: 10485760,
+      },
+    ],
+    rejected: [],
+  };
+
+  async function setupVideo(wrapper: VueWrapper): Promise<void> {
+    await pickOperation(wrapper, 'Extração de áudio');
+    await addDraft(wrapper, DRAFT_VIDEO);
+  }
+
+  it('shows extraction controls for video drafts', async () => {
+    const wrapper = mount(App);
+    await flushPromises();
+    await setupVideo(wrapper);
+
+    expect(wrapper.text()).toContain('Prontos para extrair');
+    expect(wrapper.text()).toContain('Extrair áudio para');
+    expect(wrapper.find('#extract-audio-format').exists()).toBe(true);
+    expect(wrapper.text()).toContain('Extrair áudio de 1 vídeo');
+    expect((wrapper.find('#extract-audio-format').element as HTMLSelectElement).value).toBe('mp3');
+
+    expect(wrapper.text()).not.toContain('Converter todos para');
+    expect(wrapper.text()).not.toContain('Tamanho máximo');
+
+    wrapper.unmount();
+  });
+
+  it('ignores non-video files and reports it', async () => {
+    const wrapper = mount(App);
+    await flushPromises();
+    await pickOperation(wrapper, 'Extração de áudio');
+    await addDraft(wrapper, DRAFT_A);
+
+    expect(wrapper.text()).toContain('A extração de áudio aceita somente vídeos');
+    expect(wrapper.text()).toContain('Nenhum arquivo adicionado ainda.');
+
+    wrapper.unmount();
+  });
+
+  it('submits an extract request with the chosen audio format', async () => {
+    const wrapper = mount(App);
+    await flushPromises();
+    await setupVideo(wrapper);
+
+    await wrapper.find('#extract-audio-format').setValue('m4a');
+    await flushPromises();
+
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text().trim() === 'Extrair áudio de 1 vídeo')!
+      .trigger('click');
+    await flushPromises();
+
+    const calls = apiMock.startConversion.mock.calls;
+    expect(calls).toHaveLength(1);
+    const request = calls[0]![0];
+    expect(request.operation).toBe('extract');
+    expect(request.destination).toBeNull();
+    expect(request.items).toEqual([
+      { inputPath: '/tmp/clip.mp4', targetFormat: 'm4a', quality: 'high' },
+    ]);
+
+    wrapper.unmount();
+  });
+});
