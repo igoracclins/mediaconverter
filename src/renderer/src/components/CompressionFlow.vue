@@ -46,7 +46,7 @@ async function onCompress(category: MediaCategory): Promise<void> {
 
     <DropZone @added="onAdded" />
 
-    <div v-if="drafts.length > 0" class="flex flex-col gap-3">
+    <div v-if="drafts.length > 0" class="flex flex-col gap-4">
       <div class="flex justify-end">
         <button
           type="button"
@@ -64,6 +64,6 @@ async function onCompress(category: MediaCategory): Promise<void> {
         @compress="onCompress"
       />
     </div>
-    <p v-else class="mt-2 text-center text-xs text-ink-dim">Nenhum arquivo adicionado ainda.</p>
+    <p v-else class="text-center text-xs text-ink-dim">Nenhum arquivo adicionado ainda.</p>
   </section>
 </template>

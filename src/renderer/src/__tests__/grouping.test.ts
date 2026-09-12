@@ -128,7 +128,10 @@ describe('category grouping', () => {
     await pickOperation(wrapper, 'Conversão');
     await addDraft(wrapper);
 
-    const groups = wrapper.findComponent(DraftList).findAll('div.mb-5');
+    const groups = wrapper
+      .findComponent(DraftList)
+      .findAll('h3')
+      .map((h) => h.parent()!.parent()!);
     const video = groups.find((g) => g.text().includes('Vídeos'))!;
     const audio = groups.find((g) => g.text().includes('Áudios'))!;
     const image = groups.find((g) => g.text().includes('Imagens'))!;

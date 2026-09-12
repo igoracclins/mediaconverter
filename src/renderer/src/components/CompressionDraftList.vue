@@ -38,44 +38,46 @@ function actionLabel(category: MediaCategory, count: number): string {
 </script>
 
 <template>
-  <section>
-    <div class="mb-2 flex items-baseline justify-between">
+  <section class="flex flex-col gap-3">
+    <div class="flex items-baseline justify-between px-1">
       <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-dim">
         Compressão por arquivo
       </h2>
       <span class="text-xs text-ink-dim">{{ countLabel(items.length) }}</span>
     </div>
 
-    <p class="mb-3 px-1 text-xs text-ink-dim">
+    <p class="px-1 text-xs text-ink-dim">
       Cada arquivo é comprimido mantendo o próprio formato original (ex.: MP4 -> MP4, MP3 -> MP3, JPG
       -> JPG). Defina o tamanho máximo de cada arquivo abaixo.
     </p>
 
-    <div v-for="group in groups" :key="group.category" class="mb-3">
-      <div class="mb-1.5 flex items-baseline gap-2 px-1">
+    <div v-for="group in groups" :key="group.category" class="flex flex-col gap-1.5">
+      <div class="flex items-baseline gap-2 px-1">
         <h3 class="text-sm font-semibold text-ink">{{ CATEGORY_LABELS[group.category] }}</h3>
         <span class="text-xs text-ink-dim">{{ countLabel(group.entries.length) }}</span>
       </div>
 
-      <ul class="divide-y divide-edge overflow-hidden rounded-xl border border-edge bg-surface-alt">
-        <CompressionDraftCard
-          v-for="entry in group.entries"
-          :key="entry.item.id"
-          :item="entry.item"
-          @remove="(id) => emit('remove', id)"
-          @update-max="(id, value) => emit('updateConfig', id, { maxSizeRaw: value })"
-        />
-      </ul>
+      <div class="overflow-hidden rounded-xl border border-edge bg-surface-alt">
+        <div class="flex flex-wrap items-center gap-3 border-b border-edge px-4 py-2.5">
+          <button
+            type="button"
+            :disabled="props.converting || categoryReadyCounts[group.category] === 0"
+            class="ml-auto shrink-0 cursor-pointer rounded-md border border-accent bg-surface-raised px-4 py-1 text-sm font-medium text-ink transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            @click="emit('compress', group.category)"
+          >
+            {{ actionLabel(group.category, categoryReadyCounts[group.category]) }}
+          </button>
+        </div>
 
-      <div class="mt-3 flex flex-col gap-3 rounded-xl border border-edge bg-surface-alt p-3">
-        <button
-          type="button"
-          :disabled="props.converting || categoryReadyCounts[group.category] === 0"
-          class="shrink-0 cursor-pointer rounded-md border border-accent bg-surface-raised px-4 py-1.5 text-sm font-medium text-ink transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          @click="emit('compress', group.category)"
-        >
-          {{ actionLabel(group.category, categoryReadyCounts[group.category]) }}
-        </button>
+        <ul class="divide-y divide-edge">
+          <CompressionDraftCard
+            v-for="entry in group.entries"
+            :key="entry.item.id"
+            :item="entry.item"
+            @remove="(id) => emit('remove', id)"
+            @update-max="(id, value) => emit('updateConfig', id, { maxSizeRaw: value })"
+          />
+        </ul>
       </div>
     </div>
   </section>
