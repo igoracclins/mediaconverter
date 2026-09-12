@@ -17,11 +17,13 @@ Os instaladores são disponibilizados como assets das Releases do projeto.
 
 ## Sobre o projeto
 
-Projeto desenvolvido para fins acadêmicos. O aplicativo permite adicionar vários arquivos de mídia, escolher o formato de saída desejado (opção "Converter todos para") e processá-los em uma fila, com acompanhamento do progresso em tempo real. O formato escolhido é aplicado globalmente aos arquivos compatíveis.
+Projeto desenvolvido para fins acadêmicos. O aplicativo permite adicionar vários arquivos de mídia e processá-los em uma fila, com acompanhamento do progresso em tempo real, em três operações:
 
-Além da conversão convencional, cada arquivo pode ser comprimido com um limite de tamanho máximo de saída em megabytes. O aplicativo ajusta os parâmetros de codificação para buscar a melhor qualidade possível dentro desse limite.
+- **Conversão**: escolha o formato de saída desejado (opção "Converter todos para"), aplicado globalmente aos arquivos compatíveis.
+- **Compressão**: cada arquivo é comprimido com um limite de tamanho máximo de saída em megabytes, mantendo o próprio formato original; o aplicativo ajusta os parâmetros de codificação para buscar a melhor qualidade possível dentro desse limite.
+- **Extração de áudio**: vídeos têm apenas a faixa de áudio extraída, sem reencodificação quando o contêiner e o codec permitem (stream copy).
 
-Convertido ou comprimido, o resultado é salvo em uma pasta `Convertidos`, criada ao lado do arquivo de origem.
+Os resultados são salvos em pastas criadas ao lado do arquivo de origem: `Convertidos` (conversão e compressão) e `Extraidos` (extração de áudio).
 
 ## Funcionalidades
 
@@ -30,8 +32,10 @@ Convertido ou comprimido, o resultado é salvo em uma pasta `Convertidos`, criad
 - Seleção global do formato de saída, através da opção "Converter todos para".
 - Compressão individual por arquivo, com definição de tamanho máximo de saída.
 - Ajuste automático dos parâmetros de codificação na compressão.
+- Extração da faixa de áudio de vídeos, sem reencodificação quando o contêiner e o codec permitem (stream copy).
 - Identificação de arquivos de formato não suportado no momento da adição.
-- Pasta de saída `Convertidos` criada automaticamente ao lado do arquivo de origem.
+- Pasta de saída criada automaticamente ao lado do arquivo de origem (`Convertidos` para conversão/compressão e `Extraidos` para extração).
+- Botão para abrir a pasta e localizar o arquivo de cada conversão concluída.
 - Cancelamento de conversões individuais ou de toda a fila.
 - Limpeza das conversões concluídas.
 - Arrastar e soltar arquivos na janela do aplicativo.
@@ -43,6 +47,8 @@ Convertido ou comprimido, o resultado é salvo em uma pasta `Convertidos`, criad
 | Áudio     | MP3, WAV, M4A, OGG, FLAC |
 | Vídeo     | MP4, MOV, MKV, WEBM      |
 | Imagem    | JPG, PNG, WEBP, AVIF     |
+
+Na extração de áudio, o destino pode ser qualquer um dos formatos de áudio acima (padrão MP3). Quando o codec de áudio do vídeo é compatível com o contêiner de destino, a faixa é copiada diretamente, sem reencodificação.
 
 ## Tecnologias
 
