@@ -1,27 +1,20 @@
-import { onBeforeUnmount, ref } from 'vue';
+import { ref } from 'vue';
 import type { ConversionRequestItem, StartConversionResult } from '@shared/ipc';
 import type { MediaCategory, QualityPreset } from '@shared/types';
 import { userMessage } from '@shared/errors';
-import { parseTargetSizeMb } from '@conversion/compress';
 import type { CompressDraft, CompressionDraftConfig } from '../types';
-import { compressTargetFor, initialSizeMb, maxSizeWithinLimit } from '../compression-ui';
+import { compressTargetFor, maxSizeValidation } from '../compression-ui';
 
 export type BannerMessage = { kind: 'error' | 'info'; text: string };
 
 function newCompressionConfig(): CompressionDraftConfig {
-  return {
-    maxSizeRaw: '',
-    estimate: null,
-    estimating: false,
-    lastSyncKey: null,
-  };
+  return { maxSizeRaw: '' };
 }
 
 export function useCompressionStore() {
   const operation = 'compress' as const;
   const drafts = ref<CompressDraft[]>([]);
   const converting = ref(false);
-  let estimateTimer: ReturnType<typeof setTimeout> | null = null;
 
   async function addFiles(paths: string[]): Promise<BannerMessage | null> {
     const result = await window.api.inspectFiles(paths);
@@ -33,7 +26,6 @@ export function useCompressionStore() {
       drafts.value.push({ ...file, id: file.path, compression: newCompressionConfig() });
       added++;
     }
-    if (added > 0) scheduleEstimateSync();
     if (result.rejected.length > 0) {
       return result.rejected.length === 1
         ? { kind: 'error' as const, text: userMessage(result.rejected[0]?.reason ?? 'UNSUPPORTED_SOURCE') }
@@ -57,60 +49,6 @@ export function useCompressionStore() {
     const draft = drafts.value.find((d) => d.id === id);
     if (!draft) return;
     Object.assign(draft.compression, patch);
-    scheduleEstimateSync();
-  }
-
-  function scheduleEstimateSync(): void {
-    if (estimateTimer) clearTimeout(estimateTimer);
-    estimateTimer = setTimeout(() => {
-      void syncEstimates();
-    }, 350);
-  }
-
-  async function syncEstimates(): Promise<void> {
-    for (let round = 0; round < 2; round++) {
-      let changed = false;
-      for (const draft of drafts.value) {
-        const cfg = draft.compression;
-        const target = compressTargetFor(draft.category, draft.extension);
-        if (!target || target.lossless) continue;
-        const key = `${cfg.maxSizeRaw}`;
-        if (cfg.estimating || cfg.lastSyncKey === key) continue;
-        const maxMb = parseTargetSizeMb(cfg.maxSizeRaw);
-        const probe = maxMb ?? 1;
-        cfg.estimating = true;
-        changed = true;
-        try {
-          const result = await window.api.estimateCompression({
-            inputPath: draft.path,
-            targetFormat: target.format,
-            maxSizeMb: probe,
-          });
-          let seeded = false;
-          if (result.ok) {
-            if (maxMb === null && cfg.maxSizeRaw.trim() === '') {
-              const seededMb = initialSizeMb({
-                sizeBytes: draft.sizeBytes,
-                recommendedMinMb: result.estimate.recommendedMinMb,
-                hardMinMb: result.estimate.hardMinMb,
-                category: draft.category,
-              });
-              if (seededMb !== null) {
-                cfg.maxSizeRaw = String(seededMb);
-                seeded = true;
-              }
-            }
-            cfg.estimate = seeded ? null : result.estimate;
-          } else {
-            cfg.estimate = null;
-          }
-        } finally {
-          cfg.estimating = false;
-          cfg.lastSyncKey = key;
-        }
-      }
-      if (!changed) break;
-    }
   }
 
   async function submitCategory(
@@ -128,14 +66,13 @@ export function useCompressionStore() {
         const cfg = draft.compression;
         const target = compressTargetFor(draft.category, draft.extension);
         if (!target || target.lossless) continue;
-        const maxSizeMb = parseTargetSizeMb(cfg.maxSizeRaw);
-        if (maxSizeMb === null) continue;
-        if (!maxSizeWithinLimit(cfg.maxSizeRaw, draft.sizeBytes)) continue;
+        const validation = maxSizeValidation(cfg.maxSizeRaw, draft.sizeBytes);
+        if (!validation.ok || validation.maxMb === null) continue;
         items.push({
           inputPath: draft.path,
           targetFormat: target.format,
           quality: 'high' as QualityPreset,
-          compression: { maxSizeMb },
+          compression: { maxSizeMb: validation.maxMb },
         });
       }
       const submitted = new Set(items.map((item) => item.inputPath));
@@ -156,10 +93,6 @@ export function useCompressionStore() {
       converting.value = false;
     }
   }
-
-  onBeforeUnmount(() => {
-    if (estimateTimer) clearTimeout(estimateTimer);
-  });
 
   return {
     operation,

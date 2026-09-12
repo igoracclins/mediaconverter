@@ -4,7 +4,6 @@ import { mount, flushPromises, type DOMWrapper, type VueWrapper } from '@vue/tes
 import type {
   AddFilesResult,
   AppInfo,
-  CompressionEstimate,
   QueueSnapshot,
   RendererApi,
   SelectionResult,
@@ -29,15 +28,6 @@ const apiMock = {
   inspectFiles: vi.fn<(paths: string[]) => Promise<AddFilesResult>>(async () => ({
     files: [],
     rejected: [],
-  })),
-  estimateCompression: vi.fn(async () => ({
-    ok: true as const,
-    estimate: {
-      status: 'ok' as const,
-      currentSizeMb: 100,
-      recommendedMinMb: 13.4,
-      hardMinMb: 8,
-    } satisfies CompressionEstimate,
   })),
   startConversion: vi.fn<(request: StartConversionRequest) => Promise<StartConversionResult>>(
     async () => ({ ok: true as const, created: 0, rejected: [] }),

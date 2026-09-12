@@ -1,16 +1,11 @@
-import { bytesToMb, parseTargetSizeMb } from '@conversion/compress';
+import { bytesToMb, MB_BYTES } from '@conversion/compress';
 import { TARGET_FORMAT_MAP } from '@shared/formats';
-import type { CompressionEstimate } from '@shared/ipc';
 import type { MediaCategory, TargetFormat } from '@shared/types';
 import { keepFormatFor, isLosslessFormat } from './compression-format';
 import type { CompressionDraftConfig } from './types';
 
 export function formatMb(mb: number): string {
-  return `${Math.round(mb * 100) / 100} MB`;
-}
-
-export function parseMaxMb(raw: string): number | null {
-  return parseTargetSizeMb(raw);
+  return `${(Math.round(mb * 100) / 100).toFixed(2)} MB`;
 }
 
 export function originalSizeMb(sizeBytes: number): number | null {
@@ -18,97 +13,59 @@ export function originalSizeMb(sizeBytes: number): number | null {
   return bytesToMb(sizeBytes);
 }
 
-export interface InitialSizeInput {
-  sizeBytes: number;
-  recommendedMinMb: number | null;
-  hardMinMb: number | null;
-  category: MediaCategory;
-}
-
-const SEED_MARGIN_MB = 100;
-
-export const CATEGORY_MIN_SEED_MB: Record<MediaCategory, number> = {
-  audio: 3,
-  video: 15,
-  image: 0,
-};
-
-export function initialSizeMb(input: InitialSizeInput): number | null {
-  const limitMb = originalSizeMb(input.sizeBytes);
-  if (limitMb === null) return null;
-  const recommended = input.recommendedMinMb ?? input.hardMinMb;
-  if (recommended === null || recommended <= 0) return null;
-  const candidate = recommended + SEED_MARGIN_MB;
-  const hardMin = input.hardMinMb ?? 0;
-  const qualityFloor =
-    input.category === 'image'
-      ? Math.min(hardMin, limitMb)
-      : Math.max(hardMin, CATEGORY_MIN_SEED_MB[input.category]);
-  const seed = Math.min(Math.max(Math.min(candidate, limitMb), qualityFloor), limitMb);
-  const rounded = Math.floor(seed * 100) / 100;
-  return rounded > 0 ? rounded : limitMb;
-}
-
-export function maxSizeWithinLimit(raw: string, sizeBytes: number): boolean {
-  const parsed = parseMaxMb(raw);
-  if (parsed === null) return false;
-  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return true;
-  return parsed <= originalSizeMb(sizeBytes)!;
-}
-
-export type HintKind = 'info' | 'warning' | 'error';
-
-export interface CompressionHint {
-  kind: HintKind;
-  text: string;
-}
-
-export function compressionHint(
-  estimate: CompressionEstimate | null,
-  formatLabel: string,
-  sizeBytes: number,
-  maxMb: number | null,
-): CompressionHint | null {
-  if (!estimate) return null;
-  if (estimate.status === 'unsupported') {
-    if (estimate.unsupportedReason === 'lossless-target') {
-      return {
-        kind: 'warning',
-        text: `O formato ${formatLabel} é sem perdas: ele não reduz o tamanho sob demanda. Para comprimir, escolha um formato com compressão (ex.: MP3, M4A, MP4, WEBM, JPG, AVIF).`,
-      };
-    }
-    return {
-      kind: 'warning',
-      text: 'Não foi possível estimar o tamanho recomendado para este arquivo (duração desconhecida).',
-    };
-  }
-  const limitMb = originalSizeMb(sizeBytes);
-  if (maxMb !== null && limitMb !== null) {
-    if (maxMb >= limitMb) {
-      return {
-        kind: 'info',
-        text: 'O limite não exige redução do tamanho original do arquivo.',
-      };
-    }
-    if (limitMb - maxMb <= limitMb * 0.05) {
-      return null;
+export function sanitizeSizeInput(raw: string): string {
+  let out = '';
+  let separator: '.' | ',' | null = null;
+  for (const ch of raw) {
+    if (ch >= '0' && ch <= '9') {
+      out += ch;
+    } else if ((ch === '.' || ch === ',') && separator === null) {
+      separator = ch;
+      out += ch;
     }
   }
-  if (estimate.status === 'impossible') {
-    const hardMin = estimate.hardMinMb ?? 0;
-    return {
-      kind: 'error',
-      text: `Esse limite é muito baixo para manter uma qualidade aceitável. Tamanho mínimo recomendado: aproximadamente ${formatMb(hardMin)}.`,
-    };
+  return out;
+}
+
+export function parseMaxInput(raw: string): number | null {
+  const cleaned = raw.trim().replace(',', '.');
+  if (cleaned === '' || cleaned === '.') return null;
+  if (!/^\d*\.?\d*$/.test(cleaned)) return null;
+  const value = Number(cleaned);
+  return Number.isFinite(value) ? value : null;
+}
+
+export function minimumAllowedMb(sizeBytes: number): number {
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) return 0.1;
+  return Math.max((sizeBytes * 0.05) / MB_BYTES, 0.1);
+}
+
+export type MaxSizeIssue = 'empty' | 'not-number' | 'not-below-original' | 'below-minimum';
+
+export interface MaxSizeValidation {
+  ok: boolean;
+  maxMb: number | null;
+  issue: MaxSizeIssue | null;
+}
+
+export function maxSizeValidation(raw: string, sizeBytes: number): MaxSizeValidation {
+  const value = parseMaxInput(raw);
+  if (value === null) {
+    return { ok: false, maxMb: null, issue: raw.trim() === '' ? 'empty' : 'not-number' };
   }
-  if (estimate.status === 'aggressive') {
-    const recMin = estimate.recommendedMinMb ?? 0;
-    return {
-      kind: 'warning',
-      text: `Este limite exige compressão agressiva e pode causar perda significativa de qualidade. Tamanho recomendado para melhor qualidade: aproximadamente ${formatMb(recMin)}.`,
-    };
+  if (value <= 0) {
+    return { ok: false, maxMb: value, issue: 'empty' };
   }
-  return { kind: 'info', text: 'Configuração possível dentro do limite.' };
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    return { ok: true, maxMb: value, issue: null };
+  }
+  if (value * MB_BYTES >= sizeBytes) {
+    return { ok: false, maxMb: value, issue: 'not-below-original' };
+  }
+  if (value < minimumAllowedMb(sizeBytes)) {
+    return { ok: false, maxMb: value, issue: 'below-minimum' };
+  }
+  return { ok: true, maxMb: value, issue: null };
 }
 
 export interface CompressTarget {
@@ -133,10 +90,8 @@ export function isCompressionReady(
   cfg: CompressionDraftConfig | null,
   sizeBytes: number,
 ): boolean {
-  if (!cfg) return false;
   const target = compressTargetFor(category, extension);
   if (!target || target.lossless) return false;
-  const maxMb = parseMaxMb(cfg.maxSizeRaw);
-  if (maxMb === null) return false;
-  return maxSizeWithinLimit(cfg.maxSizeRaw, sizeBytes);
+  const validation = maxSizeValidation(cfg?.maxSizeRaw ?? '', sizeBytes);
+  return validation.ok && validation.maxMb !== null && validation.maxMb > 0;
 }

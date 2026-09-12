@@ -4,9 +4,6 @@ import { mount, flushPromises, type DOMWrapper, type VueWrapper } from '@vue/tes
 import type {
   AddFilesResult,
   AppInfo,
-  CompressionEstimate,
-  CompressionEstimateRequest,
-  EstimateCompressionResult,
   QueueSnapshot,
   RendererApi,
   SelectionResult,
@@ -29,17 +26,6 @@ const apiMock = {
   inspectFiles: vi.fn<(paths: string[]) => Promise<AddFilesResult>>(async () => ({
     files: [],
     rejected: [],
-  })),
-  estimateCompression: vi.fn<
-    (request: CompressionEstimateRequest) => Promise<EstimateCompressionResult>
-  >(async () => ({
-    ok: true,
-    estimate: {
-      status: 'ok',
-      currentSizeMb: 100,
-      recommendedMinMb: 13.4,
-      hardMinMb: 8,
-    } satisfies CompressionEstimate,
   })),
   startConversion: vi.fn<(request: StartConversionRequest) => Promise<StartConversionResult>>(
     async () => ({ ok: true, created: 0, rejected: [] }),
@@ -102,15 +88,6 @@ async function settle(): Promise<void> {
   await flushPromises();
 }
 
-function lastEstimateCallFor(path: string): CompressionEstimateRequest | undefined {
-  const calls = apiMock.estimateCompression.mock.calls;
-  for (let i = calls.length - 1; i >= 0; i--) {
-    const request = calls[i]![0];
-    if (request.inputPath === path) return request;
-  }
-  return undefined;
-}
-
 function installApi(): void {
   vi.useFakeTimers();
   vi.clearAllMocks();
@@ -118,15 +95,6 @@ function installApi(): void {
   apiMock.onQueueUpdated.mockReturnValue(() => undefined);
   apiMock.openFiles.mockResolvedValue({ cancelled: true, files: [] });
   apiMock.inspectFiles.mockResolvedValue({ files: [], rejected: [] });
-  apiMock.estimateCompression.mockResolvedValue({
-    ok: true,
-    estimate: {
-      status: 'ok',
-      currentSizeMb: 100,
-      recommendedMinMb: 13.4,
-      hardMinMb: 8,
-    } satisfies CompressionEstimate,
-  });
   const win = window as unknown as { api: RendererApi };
   win.api = apiMock as unknown as RendererApi;
 }
@@ -197,7 +165,7 @@ describe('Compressão individual por arquivo', () => {
     return wrapper;
   }
 
-  it('shows only compression controls without the removed guarantee message', async () => {
+  it('shows only compression controls without any quality recommendation', async () => {
     const wrapper = mount(App);
     await flushPromises();
     await pickOperation(wrapper, 'Compressão');
@@ -207,10 +175,14 @@ describe('Compressão individual por arquivo', () => {
     const html = wrapper.html();
     expect(wrapper.text()).toContain('Tamanho máximo');
     expect(wrapper.text()).toContain('Comprimir 1 áudio');
+    expect(wrapper.text()).toContain('Defina um tamanho máximo (em MB) para este arquivo.');
     expect(wrapper.find('input[inputmode="decimal"]').exists()).toBe(true);
 
     expect(html).not.toContain('não ultrapassará o tamanho máximo');
     expect(html).not.toContain('prioriza a melhor qualidade');
+    expect(wrapper.text()).not.toContain('qualidade aceitável');
+    expect(wrapper.text()).not.toContain('tamanho mínimo recomendado');
+    expect(wrapper.text()).not.toContain('tamanho recomendado');
 
     expect(wrapper.text()).not.toContain('Perfil');
     expect(wrapper.text()).not.toContain('alvo aproximado');
@@ -254,12 +226,13 @@ describe('Compressão individual por arquivo', () => {
     wrapper.unmount();
   });
 
-  it('seeds each file max size from the estimator and there is no profile select', async () => {
+  it('drafts start without a max size configured', async () => {
     const wrapper = await setupTwo();
 
     expect(wrapper.findAll('select').length).toBe(0);
-    expect(numberInputs(wrapper)[0]!.element.value).toBe('100');
-    expect(numberInputs(wrapper)[1]!.element.value).toBe('100');
+    expect(numberInputs(wrapper)[0]!.element.value).toBe('');
+    expect(numberInputs(wrapper)[1]!.element.value).toBe('');
+    expect(numberInputs(wrapper)[0]!.attributes('placeholder')).toBe('0,00');
 
     wrapper.unmount();
   });
@@ -268,11 +241,11 @@ describe('Compressão individual por arquivo', () => {
     const wrapper = await setupTwo();
 
     await numberInputs(wrapper)[0]!.setValue('30');
-    await numberInputs(wrapper)[1]!.setValue('100');
+    await numberInputs(wrapper)[1]!.setValue('80');
     await settle();
 
     expect(numberInputs(wrapper)[0]!.element.value).toBe('30');
-    expect(numberInputs(wrapper)[1]!.element.value).toBe('100');
+    expect(numberInputs(wrapper)[1]!.element.value).toBe('80');
 
     wrapper.unmount();
   });
@@ -281,27 +254,39 @@ describe('Compressão individual por arquivo', () => {
     const wrapper = await setupTwo();
 
     await numberInputs(wrapper)[0]!.setValue('30');
-    await numberInputs(wrapper)[1]!.setValue('100');
+    await numberInputs(wrapper)[1]!.setValue('80');
     await settle();
     await numberInputs(wrapper)[0]!.setValue('45');
     await settle();
 
     expect(numberInputs(wrapper)[0]!.element.value).toBe('45');
-    expect(numberInputs(wrapper)[1]!.element.value).toBe('100');
-    expect(lastEstimateCallFor('/tmp/b.ogg')?.maxSizeMb).toBe(100);
+    expect(numberInputs(wrapper)[1]!.element.value).toBe('80');
 
     wrapper.unmount();
   });
 
-  it('runs the estimator per file with its own maxSizeMb limit', async () => {
+  it('accepts a comma decimal separator and keeps it in the field', async () => {
     const wrapper = await setupTwo();
 
-    await numberInputs(wrapper)[0]!.setValue('30');
-    await numberInputs(wrapper)[1]!.setValue('100');
+    await numberInputs(wrapper)[0]!.setValue('30,5');
     await settle();
 
-    expect(lastEstimateCallFor('/tmp/a.ogg')?.maxSizeMb).toBe(30);
-    expect(lastEstimateCallFor('/tmp/b.ogg')?.maxSizeMb).toBe(100);
+    expect(numberInputs(wrapper)[0]!.element.value).toBe('30,5');
+
+    wrapper.unmount();
+  });
+
+  it('strips letters and extra separators typed into the max size input', async () => {
+    const wrapper = await setupTwo();
+    const input = numberInputs(wrapper)[0]!;
+
+    await input.setValue('abc30.5def');
+    await settle();
+
+    expect(input.element.value).toBe('30.5');
+
+    await input.setValue('40,,.x');
+    expect(input.element.value).toBe('40,');
 
     wrapper.unmount();
   });
@@ -309,8 +294,8 @@ describe('Compressão individual por arquivo', () => {
   it('sends each job its own compression maxSizeMb limit', async () => {
     const wrapper = await setupTwo();
 
-    await numberInputs(wrapper)[0]!.setValue('30');
-    await numberInputs(wrapper)[1]!.setValue('100');
+    await numberInputs(wrapper)[0]!.setValue('30,5');
+    await numberInputs(wrapper)[1]!.setValue('80');
     await settle();
 
     await wrapper
@@ -325,8 +310,8 @@ describe('Compressão individual por arquivo', () => {
     expect(request.operation).toBe('compress');
     expect(request.destination).toBeNull();
     expect(request.items.map((item) => item.compression)).toEqual([
-      { maxSizeMb: 30 },
-      { maxSizeMb: 100 },
+      { maxSizeMb: 30.5 },
+      { maxSizeMb: 80 },
     ]);
 
     wrapper.unmount();
@@ -336,7 +321,7 @@ describe('Compressão individual por arquivo', () => {
     const wrapper = await setupTwo();
 
     await numberInputs(wrapper)[0]!.setValue('0');
-    await numberInputs(wrapper)[1]!.setValue('100');
+    await numberInputs(wrapper)[1]!.setValue('80');
     await settle();
 
     await wrapper
@@ -348,12 +333,12 @@ describe('Compressão individual por arquivo', () => {
     const calls = apiMock.startConversion.mock.calls;
     expect(calls).toHaveLength(1);
     const request = calls[0]![0];
-    expect(request.items.map((item) => item.compression)).toEqual([{ maxSizeMb: 100 }]);
+    expect(request.items.map((item) => item.compression)).toEqual([{ maxSizeMb: 80 }]);
 
     wrapper.unmount();
   });
 
-  it('the max-size number input does not react to the wheel', async () => {
+  it('the max-size input does not react to the wheel', async () => {
     const wrapper = await setupTwo();
     const input = numberInputs(wrapper)[0]!;
 
@@ -365,58 +350,30 @@ describe('Compressão individual por arquivo', () => {
     wrapper.unmount();
   });
 
-  it('never seeds above the original file size for small files', async () => {
-    const wrapper = mount(App);
-    await flushPromises();
-    await pickOperation(wrapper, 'Compressão');
-    const draft: AddFilesResult = {
-      files: [
-        {
-          path: '/tmp/tiny.ogg',
-          name: 'tiny.ogg',
-          extension: 'ogg',
-          category: 'audio',
-          sizeBytes: 102400,
-        },
-      ],
-      rejected: [],
-    };
-    apiMock.openFiles.mockResolvedValue({ cancelled: false, files: draft.files });
-    apiMock.inspectFiles.mockResolvedValue(draft);
-    apiMock.estimateCompression.mockResolvedValue({
-      ok: true,
-      estimate: {
-        status: 'ok',
-        currentSizeMb: 0.098,
-        recommendedMinMb: 2,
-        hardMinMb: 1,
-      },
-    });
-    await wrapper.findComponent(DropZone).trigger('click');
-    await flushPromises();
-    await settle();
-
-    expect(numberInputs(wrapper)[0]!.element.value).toBe('0.09');
-    const maxValue = numberInputs(wrapper)[0]!.element.getAttribute('max');
-    expect(maxValue).not.toBeNull();
-    expect(Number(maxValue)).toBeCloseTo(102400 / 1048576, 6);
-    expect(Number(numberInputs(wrapper)[0]!.element.value)).toBeLessThanOrEqual(Number(maxValue));
-
-    wrapper.unmount();
-  });
-
-  it('shows an error hint when the max size exceeds the original size', async () => {
+  it('shows an error hint when the max size is not below the original size', async () => {
     const wrapper = await setupTwo();
 
     await numberInputs(wrapper)[0]!.setValue('150');
     await settle();
 
-    expect(wrapper.text()).toContain('não pode ser maior que o tamanho original');
+    expect(wrapper.text()).toContain('menor que o tamanho original');
 
     wrapper.unmount();
   });
 
-  it('does not submit a file whose max size exceeds the original size', async () => {
+  it('shows the permitted minimum when the limit is below the 5% floor', async () => {
+    const wrapper = await setupTwo();
+
+    await numberInputs(wrapper)[0]!.setValue('0.5');
+    await settle();
+
+    expect(wrapper.text()).toContain('mínimo permitido');
+    expect(wrapper.text()).toContain('5.00 MB');
+
+    wrapper.unmount();
+  });
+
+  it('does not submit a file whose max size is not valid', async () => {
     const wrapper = await setupTwo();
 
     await numberInputs(wrapper)[0]!.setValue('30');
