@@ -83,27 +83,26 @@ export function compressionHint(
     };
   }
   const limitMb = originalSizeMb(sizeBytes);
-  const displayedFileMb = limitMb === null ? null : Math.round(limitMb * 100) / 100;
-  if (maxMb !== null && displayedFileMb !== null) {
-    if (maxMb >= displayedFileMb) {
+  if (maxMb !== null && limitMb !== null) {
+    if (maxMb >= limitMb) {
       return {
         kind: 'info',
         text: 'O limite não exige redução do tamanho original do arquivo.',
       };
     }
-    if (displayedFileMb - maxMb <= displayedFileMb * 0.05) {
+    if (limitMb - maxMb <= limitMb * 0.05) {
       return null;
     }
   }
   if (estimate.status === 'impossible') {
-    const hardMin = Math.min(estimate.hardMinMb ?? 0, limitMb ?? Infinity);
+    const hardMin = estimate.hardMinMb ?? 0;
     return {
       kind: 'error',
       text: `Esse limite é muito baixo para manter uma qualidade aceitável. Tamanho mínimo recomendado: aproximadamente ${formatMb(hardMin)}.`,
     };
   }
   if (estimate.status === 'aggressive') {
-    const recMin = Math.min(estimate.recommendedMinMb ?? 0, limitMb ?? Infinity);
+    const recMin = estimate.recommendedMinMb ?? 0;
     return {
       kind: 'warning',
       text: `Este limite exige compressão agressiva e pode causar perda significativa de qualidade. Tamanho recomendado para melhor qualidade: aproximadamente ${formatMb(recMin)}.`,
