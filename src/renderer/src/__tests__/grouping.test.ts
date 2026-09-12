@@ -35,6 +35,7 @@ const apiMock = {
   cancelJob: vi.fn<() => Promise<void>>(async () => undefined),
   cancelAll: vi.fn<() => Promise<void>>(async () => undefined),
   clearCompleted: vi.fn<() => Promise<void>>(async () => undefined),
+  revealOutput: vi.fn<() => Promise<void>>(async () => undefined),
   getPathForFile: vi.fn<() => string>(() => ''),
   onQueueUpdated: vi.fn<(listener: (snapshot: QueueSnapshot) => void) => () => void>(
     () => () => undefined,

@@ -38,6 +38,10 @@ function cancelJob(jobId: string): void {
   void window.api.cancelJob(jobId);
 }
 
+function revealJob(jobId: string): void {
+  void window.api.revealOutput(jobId);
+}
+
 function selectOperation(op: Operation): void {
   banner.value = null;
   operation.value = op;
@@ -156,6 +160,7 @@ watch(
       :jobs="jobs"
       :message-for="messageFor"
       @cancel="cancelJob"
+      @reveal="revealJob"
     />
 
     <div v-if="hasTerminalJobs()" class="flex justify-end">

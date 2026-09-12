@@ -172,6 +172,12 @@ export class ConversionManager {
     this.broadcast();
   }
 
+  getCompletedOutputPath(jobId: string): string | null {
+    const job = this.queue.get(jobId);
+    if (!job || job.status !== 'completed' || !job.outputPath) return null;
+    return job.outputPath;
+  }
+
   snapshot(): QueueSnapshot {
     return this.currentSnapshot();
   }

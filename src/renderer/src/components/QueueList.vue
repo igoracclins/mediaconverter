@@ -2,7 +2,7 @@
 import type { JobSnapshot } from '@shared/ipc';
 
 const props = defineProps<{ jobs: JobSnapshot[]; messageFor: (job: JobSnapshot) => string }>();
-const emit = defineEmits<{ cancel: [jobId: string] }>();
+const emit = defineEmits<{ cancel: [jobId: string]; reveal: [jobId: string] }>();
 
 const statusStyles: Record<string, string> = {
   pending: 'bg-surface-raised text-ink-dim',
@@ -67,6 +67,30 @@ function label(job: JobSnapshot): string {
         <span class="hidden shrink-0 text-[11px] text-ink-dim md:inline">{{
           job.targetFormat
         }}</span>
+
+        <button
+          v-if="job.status === 'completed'"
+          type="button"
+          class="shrink-0 cursor-pointer rounded-md p-1.5 text-ink-dim transition-colors hover:bg-surface-raised hover:text-accent"
+          title="Abrir pasta do arquivo gerado"
+          aria-label="Abrir pasta do arquivo gerado"
+          @click="emit('reveal', job.id)"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
+          </svg>
+        </button>
 
         <button
           v-if="job.status === 'pending' || job.status === 'processing'"

@@ -1,4 +1,5 @@
-import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { existsSync } from 'node:fs';
+import { BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron';
 import { isValidCompressionOptions, parseTargetSizeMb } from '@conversion/compress';
 import { formatFromValue, qualityFromValue } from '@shared/formats';
 import { AUDIO_TARGET_FORMATS, type Operation } from '@shared/types';
@@ -131,6 +132,15 @@ export function registerIpc(deps: IpcDependencies): void {
   ipcMain.handle(IPC.CancelAll, (event) => {
     if (!isTrustedSender(event)) return;
     manager.cancelAll();
+  });
+
+  ipcMain.handle(IPC.RevealOutput, (event, jobId: unknown) => {
+    if (!isTrustedSender(event)) return;
+    if (typeof jobId !== 'string') return;
+    const outputPath = manager.getCompletedOutputPath(jobId);
+    if (outputPath !== null && existsSync(outputPath)) {
+      shell.showItemInFolder(outputPath);
+    }
   });
 
   ipcMain.handle(IPC.ClearCompleted, (event) => {

@@ -116,6 +116,7 @@ export const IPC = {
   StartConversion: 'conversion:start',
   CancelJob: 'conversion:cancel-job',
   CancelAll: 'conversion:cancel-all',
+  RevealOutput: 'conversion:reveal-output',
   ClearCompleted: 'queue:clear-completed',
   QueueUpdated: 'queue:updated',
 } as const;
@@ -130,5 +131,6 @@ export interface RendererApi {
   cancelJob(jobId: string): Promise<void>;
   cancelAll(): Promise<void>;
   clearCompleted(): Promise<void>;
+  revealOutput(jobId: string): Promise<void>;
   onQueueUpdated(listener: (snapshot: QueueSnapshot) => void): () => void;
 }

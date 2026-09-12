@@ -4,12 +4,13 @@ import { IPC, type StartConversionRequest } from '@shared/ipc';
 import { registerIpc, type IpcDependencies } from '../register';
 import type { ConversionManager } from '../../services/conversion-manager';
 
-const { handlers, windowMock, sendSpy, fromWebContents } = vi.hoisted(() => {
+const { handlers, windowMock, sendSpy, fromWebContents, showItemInFolder } = vi.hoisted(() => {
   const handlers = new Map<string, (event: unknown, ...args: unknown[]) => unknown>();
   const sendSpy = vi.fn();
+  const showItemInFolder = vi.fn();
   const windowMock = { isDestroyed: () => false, webContents: { send: sendSpy } };
   const fromWebContents = vi.fn(() => windowMock);
-  return { handlers, windowMock, sendSpy, fromWebContents };
+  return { handlers, windowMock, sendSpy, fromWebContents, showItemInFolder };
 });
 
 type HandlerFn = (event: unknown, ...args: unknown[]) => unknown;
@@ -24,6 +25,9 @@ vi.mock('electron', () => ({
     fromWebContents,
     getAllWindows: () => [windowMock],
   },
+  shell: {
+    showItemInFolder,
+  },
 }));
 
 const managerMock = {
@@ -31,6 +35,7 @@ const managerMock = {
   cancelJob: vi.fn(),
   cancelAll: vi.fn(),
   clearCompleted: vi.fn(),
+  getCompletedOutputPath: vi.fn(),
   setListener: vi.fn(),
   snapshot: vi.fn(),
 };
@@ -82,6 +87,7 @@ describe('registerIpc', () => {
       IPC.StartConversion,
       IPC.CancelJob,
       IPC.CancelAll,
+      IPC.RevealOutput,
       IPC.ClearCompleted,
     ]) {
       expect(handlers.has(channel)).toBe(true);
@@ -317,6 +323,27 @@ describe('registerIpc', () => {
     expect(managerMock.cancelJob).toHaveBeenCalledTimes(1);
     expect(managerMock.cancelAll).toHaveBeenCalledTimes(1);
     expect(managerMock.clearCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it('reveals the output only for an existing completed output path', async () => {
+    registerIpc(makeDeps());
+    managerMock.getCompletedOutputPath.mockReturnValue(process.cwd());
+    await invoke(IPC.RevealOutput, 'job-1');
+    expect(managerMock.getCompletedOutputPath).toHaveBeenCalledWith('job-1');
+    expect(showItemInFolder).toHaveBeenCalledWith(process.cwd());
+
+    managerMock.getCompletedOutputPath.mockReturnValue(null);
+    showItemInFolder.mockClear();
+    await invoke(IPC.RevealOutput, 'job-missing');
+    expect(showItemInFolder).not.toHaveBeenCalled();
+
+    managerMock.getCompletedOutputPath.mockReturnValue('/tmp/does-not-exist.out');
+    showItemInFolder.mockClear();
+    await invoke(IPC.RevealOutput, 'job-gone');
+    expect(showItemInFolder).not.toHaveBeenCalled();
+
+    await invoke(IPC.RevealOutput, 12345);
+    expect(managerMock.getCompletedOutputPath).not.toHaveBeenCalledWith(12345);
   });
 
   it('rejects sensitive channels from a non-top-level (sub-frame) sender', async () => {

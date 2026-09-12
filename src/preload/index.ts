@@ -11,6 +11,7 @@ const api: RendererApi = {
   cancelJob: (jobId: string) => ipcRenderer.invoke(IPC.CancelJob, jobId),
   cancelAll: () => ipcRenderer.invoke(IPC.CancelAll),
   clearCompleted: () => ipcRenderer.invoke(IPC.ClearCompleted),
+  revealOutput: (jobId: string) => ipcRenderer.invoke(IPC.RevealOutput, jobId),
   onQueueUpdated: (listener) => {
     const handler = (_event: Electron.IpcRendererEvent, snapshot: Parameters<typeof listener>[0]) =>
       listener(snapshot);

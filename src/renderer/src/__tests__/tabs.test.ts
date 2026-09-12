@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises, type DOMWrapper, type VueWrapper } from '@vue/test-utils';
+import { nextTick } from 'vue';
 import type {
   AddFilesResult,
   AppInfo,
+  JobSnapshot,
   QueueSnapshot,
   RendererApi,
   SelectionResult,
@@ -33,6 +35,7 @@ const apiMock = {
   cancelJob: vi.fn<() => Promise<void>>(async () => undefined),
   cancelAll: vi.fn<() => Promise<void>>(async () => undefined),
   clearCompleted: vi.fn<() => Promise<void>>(async () => undefined),
+  revealOutput: vi.fn<() => Promise<void>>(async () => undefined),
   getPathForFile: vi.fn<() => string>(() => ''),
   onQueueUpdated: vi.fn<(listener: (snapshot: QueueSnapshot) => void) => () => void>(
     () => () => undefined,
@@ -468,6 +471,78 @@ describe('Extração de áudio', () => {
     expect(request.items).toEqual([
       { inputPath: '/tmp/clip.mp4', targetFormat: 'm4a', quality: 'high' },
     ]);
+
+    wrapper.unmount();
+  });
+});
+
+describe('Queue output reveal', () => {
+  beforeEach(installApi);
+  afterEach(() => vi.useRealTimers());
+
+  function completedJob(): JobSnapshot {
+    return {
+      id: 'job-1',
+      operation: 'extract',
+      name: 'clip.mp4',
+      sourceExtension: 'mp4',
+      category: 'video',
+      targetFormat: 'mp3',
+      quality: 'high',
+      status: 'completed',
+      progress: 100,
+      errorCode: null,
+      errorMessage: null,
+      outputPath: 'C:/Users/igor/Videos/Extraidos/clip.mp3',
+      createdAt: 1,
+      startedAt: 2,
+      finishedAt: 3,
+    };
+  }
+
+  it('shows a reveal button for a completed job and reveals its output', async () => {
+    let listener: ((snapshot: QueueSnapshot) => void) | null = null;
+    apiMock.onQueueUpdated.mockImplementation((cb) => {
+      listener = cb;
+      return () => undefined;
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+    expect(listener).not.toBeNull();
+
+    listener?.({ jobs: [completedJob()], running: false, activeCount: 0 });
+    await nextTick();
+    await flushPromises();
+
+    const revealButton = wrapper.find('button[aria-label="Abrir pasta do arquivo gerado"]');
+    expect(revealButton.exists()).toBe(true);
+
+    await revealButton.trigger('click');
+    await flushPromises();
+    expect(apiMock.revealOutput).toHaveBeenCalledWith('job-1');
+
+    wrapper.unmount();
+  });
+
+  it('does not show a reveal button for non-completed jobs', async () => {
+    let listener: ((snapshot: QueueSnapshot) => void) | null = null;
+    apiMock.onQueueUpdated.mockImplementation((cb) => {
+      listener = cb;
+      return () => undefined;
+    });
+
+    const wrapper = mount(App);
+    await flushPromises();
+
+    const job = completedJob();
+    job.status = 'processing';
+    job.outputPath = null;
+    listener?.({ jobs: [job], running: true, activeCount: 1 });
+    await nextTick();
+    await flushPromises();
+
+    expect(wrapper.find('button[aria-label="Abrir pasta do arquivo gerado"]').exists()).toBe(false);
 
     wrapper.unmount();
   });
