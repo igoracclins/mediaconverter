@@ -3,6 +3,7 @@ import { appendFileSync, mkdirSync } from 'node:fs';
 import { app, crashReporter, Menu, session } from 'electron';
 import { createEngineBundle } from '@conversion/service';
 import { currentArch, currentPlatform } from '@platform/info';
+import { resolveFfmpegBinaries } from '@platform/paths';
 import { logger } from './logger';
 import { createMainWindow } from './window';
 import { registerIpc } from './ipc/register';
@@ -67,9 +68,9 @@ app.whenReady().then(() => {
     Menu.setApplicationMenu(null);
   }
 
-  const ffmpegSuffix = platform === 'win32' ? '.exe' : '';
-  const ffmpegBin = `${resourcesBaseDir}/ffmpeg/${platform}-${arch}/ffmpeg${ffmpegSuffix}`;
-  const ffprobeBin = `${resourcesBaseDir}/ffmpeg/${platform}-${arch}/ffprobe${ffmpegSuffix}`;
+  const binaries = resolveFfmpegBinaries(resourcesBaseDir, platform, arch);
+  const ffmpegBin = binaries.ffmpeg;
+  const ffprobeBin = binaries.ffprobe;
   const bundle = createEngineBundle({
     ffmpegBin,
     ffprobeBin,
@@ -79,7 +80,16 @@ app.whenReady().then(() => {
     'main',
     `starting ${app.getName()} v${app.getVersion()} on ${platform}-${arch} (packaged=${app.isPackaged})`,
   );
-  logger.info('main', `ffmpeg binary: ${resourcesBaseDir}/ffmpeg/${platform}-${arch}`);
+  logger.info('main', `ffmpeg binary: ${binaries.ffmpeg}`);
+  logger.info('main', `ffprobe binary: ${binaries.ffprobe}`);
+  if (!binaries.present) {
+    logger.error(
+      'main',
+      app.isPackaged
+        ? `FFmpeg is missing from the application resources (${resourcesBaseDir}). Reinstall the application.`
+        : `FFmpeg is not prepared for ${platform}-${arch} in this checkout (expected ${binaries.ffmpeg}). Run "pnpm ffmpeg:prepare" from the project root before starting the dev server.`,
+    );
+  }
   logger.info('main', `crash dumps: ${app.getPath('crashDumps')}`);
 
   manager = new ConversionManager({ bundle, ffprobeBin });

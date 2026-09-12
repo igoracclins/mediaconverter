@@ -47,7 +47,9 @@ bundle (outside the asar):
 
 1. **`resources/ffmpeg → ffmpeg`** — the static FFmpeg/ffprobe binaries
    fetched by `pnpm ffmpeg:prepare`. The main process resolves them via
-   `process.resourcesPath` (packaged) or `import.meta.dirname` (dev).
+   `process.resourcesPath` (packaged) or, in development, the project-root
+   `resources/` directory through `app.getAppPath()` (`electron-vite dev`
+   starts Electron with the project root as app path).
 
 2. **`third_party/ffmpeg → licenses/ffmpeg`** — GPL license text and
    corresponding-source offer (`COPYING.GPLv2`, `SOURCE.txt`). Required by

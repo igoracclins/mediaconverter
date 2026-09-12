@@ -26,6 +26,16 @@ After that the dev server starts with:
 pnpm dev
 ```
 
+> `resources/ffmpeg/` is gitignored and platform-scoped: the binaries prepared
+> for one machine are never carried over to another. Run `pnpm ffmpeg:prepare`
+> once on **every** machine where you develop (a freshly cloned Windows
+> checkout needs it too). Starting `pnpm dev` without it makes every
+> FFmpeg-backed job fail immediately with `FFMPEG_NOT_FOUND`
+> (*"Não foi possível iniciar o mecanismo de conversão…"*), even though the
+> installed application works — the installer ships the binaries via
+> `extraResources`. `pnpm ffmpeg:verify` reports any platform that was not
+> prepared for.
+
 ### pnpm allowBuilds (pnpm ≥ 10.18)
 
 pnpm 10 requires a build allowlist. The file `pnpm-workspace.yaml` contains an
