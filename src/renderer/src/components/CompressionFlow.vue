@@ -6,7 +6,6 @@ import type { MediaCategory } from '@shared/types';
 import { userMessage } from '@shared/errors';
 
 const emit = defineEmits<{
-  back: [];
   banner: [message: BannerMessage];
   submitStart: [];
   completion: [compressed: boolean];
@@ -33,16 +32,7 @@ async function onCompress(category: MediaCategory): Promise<void> {
 
 <template>
   <section class="flex flex-col gap-4">
-    <div class="flex items-center justify-between">
-      <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-dim">Compressão</h2>
-      <button
-        type="button"
-        class="cursor-pointer rounded-md px-2 py-1 text-xs text-ink-dim transition-colors hover:bg-surface-raised hover:text-ink"
-        @click="emit('back')"
-      >
-        Trocar operação
-      </button>
-    </div>
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-ink-dim">Compressão</h2>
 
     <DropZone @added="onAdded" />
 

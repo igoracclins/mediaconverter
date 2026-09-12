@@ -98,6 +98,14 @@ watch(
           v{{ appInfo.appVersion }} {{ appInfo.platform }} {{ appInfo.arch }}
         </p>
       </div>
+      <button
+        v-if="operation !== null"
+        type="button"
+        class="cursor-pointer rounded-md border border-accent bg-surface-raised px-4 py-1.5 text-sm font-medium text-ink transition-colors hover:opacity-90"
+        @click="backToPicker"
+      >
+        Trocar operação
+      </button>
     </header>
 
     <div
@@ -120,14 +128,12 @@ watch(
     <template v-else>
       <ConversionFlow
         v-if="operation === 'convert'"
-        @back="backToPicker"
         @banner="onBanner"
         @submit-start="onSubmitStart"
         @completion="onCompletion"
       />
       <CompressionFlow
         v-else
-        @back="backToPicker"
         @banner="onBanner"
         @submit-start="onSubmitStart"
         @completion="onCompletion"
