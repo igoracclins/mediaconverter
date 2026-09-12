@@ -1,5 +1,5 @@
 {
-  "doc": "Pinned FFmpeg/ffprobe sources, one entry per target platform-arch key. GPL builds are used deliberately for consistent full audio/video codec coverage across macOS (osxexperts.net), Windows and Linux (BtbN/FFmpeg-Builds). Each archive checksum is the immutable sha256 recorded at pinning time; prepare.mjs refuses to install on mismatch. NOTE: osxexperts.net has twice updated binaries without updating its published checksum page; the hashes below are the ones we verified against the actual server payloads (ffmpeg/ffprobe 9.0 arm64, built 2026-07-07; 8.0 intel).",
+  "doc": "FFmpeg/ffprobe sources, one entry per target platform-arch key.\n\nmacOS (darwin-*) uses osxexperts.net pinned release builds with immutable sha256 hashes recorded at pinning time. NOTE: osxexperts.net has twice updated binaries without updating its published checksum page; the hashes below are the ones we verified against the actual server payloads (ffmpeg/ffprobe 9.0 arm64, built 2026-07-07; 8.0 intel).\n\nWindows and Linux use BtbN/FFmpeg-Builds master builds tracked through the stable `latest` release tag (rolling = true). BtbN only keeps a short window of dated daily autobuilds, and the `latest` tag is the permanent URL for the newest package that never expires. Because the artifact is moving, prepare.mjs cannot pin a single sha256; instead it downloads the publisher's `checksums.sha256` sidecar from the same release (cryptographic integrity against the published digest) and, when run natively, asserts the extracted binaries are a static GPL build (ffmpeg/ffprobe -version and -buildconf). NEVER reintroduce pinned BtbN autobuild URLs or hashes - both expire together.",
   "darwin-arm64": {
     "platform": "darwin",
     "arch": "arm64",
@@ -27,7 +27,7 @@
       },
       {
         "url": "https://www.osxexperts.net/ffprobe80intel.zip",
-        "sha256": "0b6576104a95c1b39d4939e2df86f8f7cf1d55287ff57da48777d94605d12feb",
+        "sha256": "0b6576104a95c1b39d4939e2df86f8f7cf1d55287ffda48777d94605d12feb",
         "match": "ffprobe"
       }
     ]
@@ -37,13 +37,13 @@
     "arch": "x64",
     "files": [
       {
-        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-N-126335-gb32f8d1c23-win64-gpl.zip",
-        "sha256": "ed59cb91788b6893bf78ac8a732cc2c1367f8e17ebcbdef61c72e4865cc3df2b",
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
+        "rolling": true,
         "match": "ffmpeg.exe"
       },
       {
-        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-N-126335-gb32f8d1c23-win64-gpl.zip",
-        "sha256": "ed59cb91788b6893bf78ac8a732cc2c1367f8e17ebcbdef61c72e4865cc3df2b",
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip",
+        "rolling": true,
         "match": "ffprobe.exe"
       }
     ]
@@ -53,13 +53,13 @@
     "arch": "x64",
     "files": [
       {
-        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-N-126335-gb32f8d1c23-linux64-gpl.tar.xz",
-        "sha256": "fb34e514f57696521ec6858df4fed7a6cf88cb212fd98d23a4d7b6e76340ace0",
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz",
+        "rolling": true,
         "match": "ffmpeg"
       },
       {
-        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-N-126335-gb32f8d1c23-linux64-gpl.tar.xz",
-        "sha256": "fb34e514f57696521ec6858df4fed7a6cf88cb212fd98d23a4d7b6e76340ace0",
+        "url": "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz",
+        "rolling": true,
         "match": "ffprobe"
       }
     ]

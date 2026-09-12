@@ -90,10 +90,14 @@ The Windows installer is NSIS with `oneClick: false` and
 `allowToChangeInstallationDirectory: true`, producing an artifact named
 `Media Converter-<version>-win-x64.exe`.
 
-## Updating pinned FFmpeg
+## Updating FFmpeg sources
 
-Edit `scripts/ffmpeg/sources.json`, run `pnpm ffmpeg:prepare --force`, verify
-with `pnpm ffmpeg:verify`, then rebuild:
+macOS pins a specific build: edit `scripts/ffmpeg/sources.json`, run
+`pnpm ffmpeg:prepare --force`, verify with `pnpm ffmpeg:verify`, then rebuild:
+
+Windows and Linux track BtbN's `latest` tag, so `sources.json` needs no
+editing — force a refresh with `pnpm ffmpeg:prepare --force`. See
+[ffmpeg.md](ffmpeg.md) for details.
 
 ```sh
 pnpm pack:dir

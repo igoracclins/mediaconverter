@@ -35,6 +35,10 @@ pnpm dev
 > installed application works — the installer ships the binaries via
 > `extraResources`. `pnpm ffmpeg:verify` reports any platform that was not
 > prepared for.
+>
+> Windows and Linux binaries are tracked through BtbN's permanent `latest` tag
+> (see [ffmpeg.md](ffmpeg.md)); preparation does not depend on a dated build, so
+> a fresh clone can always run `pnpm ffmpeg:prepare`.
 
 ### pnpm allowBuilds (pnpm ≥ 10.18)
 
@@ -56,8 +60,8 @@ its name must be inserted there or `pnpm install` refuses to build it.
 | `pnpm typecheck`                                        | `vue-tsc` (renderer) + `tsc` (main/preload)                     |
 | `pnpm lint` / `pnpm lint:fix`                           | ESLint                                                          |
 | `pnpm format` / `pnpm format:check`                     | Prettier                                                        |
-| `pnpm ffmpeg:prepare`                                   | download + sha256-verify FFmpeg for current platform            |
-| `pnpm ffmpeg:verify`                                    | check installed binaries match sources.json                     |
+| `pnpm ffmpeg:prepare`                                   | download + verify FFmpeg for current platform                     |
+| `pnpm ffmpeg:verify`                                    | confirm prepared binaries run with all required encoders |
 | `pnpm ffmpeg:info`                                      | print installed FFmpeg version + build config                   |
 | `pnpm deps:check`                                       | verify all prod deps are in the allowlist and pinned            |
 | `pnpm licenses:check`                                   | audit production dep licenses (hard-fails on GPL/AGPL)          |

@@ -193,10 +193,10 @@ if (writeIndex > -1 && process.argv[writeIndex + 1]) {
     'licensed under the GNU GPL v2 or later. They are invoked as separate external executables and ';
   md += 'are never linked into the application, which remains MIT licensed. ';
   md +=
-    'The GPL license text and the corresponding-source offer ship in the application bundle under ';
+    '`licenses/ffmpeg/` (COPYING.GPLv2 and SOURCE.txt); downloads are verified by sha256 (pinned in ';
   md +=
-    '`licenses/ffmpeg/` (COPYING.GPLv2 and SOURCE.txt); provenance and sha256 checksums are pinned in ';
-  md += '`scripts/ffmpeg/sources.json`. See `docs/licensing.md` for the full licensing analysis.\n';
+    '`scripts/ffmpeg/sources.json` for macOS, publisher-provided `checksums.sha256` for the rolling ';
+  md += 'Windows/Linux builds). See `docs/licensing.md` for the full licensing analysis.\n';
   writeFileSync(path.resolve(root, process.argv[writeIndex + 1]), md);
   console.log(`audit: wrote ${process.argv[writeIndex + 1]}`);
 }

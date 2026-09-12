@@ -60,6 +60,64 @@ async function download(url, dest) {
   }
 }
 
+async function publishedChecksumFor(url) {
+  const name = path.basename(new URL(url).pathname);
+  const baseUrl = url.slice(0, url.lastIndexOf('/'));
+  const res = await fetch(`${baseUrl}/checksums.sha256`, {
+    signal: AbortSignal.timeout(60 * 1000),
+    redirect: 'follow',
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} fetching publisher checksums for ${name}`);
+  }
+  const text = await res.text();
+  const line = text
+    .split('\n')
+    .map((l) => l.trim())
+    .find((l) => l.endsWith(`  ${name}`) || l.endsWith(` ${name}`));
+  if (!line) {
+    throw new Error(`No checksum published for ${name} in ${baseUrl}/checksums.sha256`);
+  }
+  const hash = line.split(/\s+/)[0] ?? '';
+  if (!/^[0-9a-fA-F]{64}$/.test(hash)) {
+    throw new Error(`Malformed published checksum for ${name}`);
+  }
+  const digest = hash.toLowerCase();
+  console.log(`  ok  fetched publisher checksum for ${name} (sha256 ${digest})`);
+  return digest;
+}
+
+function assertNativeBuild(bin, match) {
+  const isFfmpeg = match === 'ffmpeg' || match === 'ffmpeg.exe';
+
+  const version = spawnSync(bin, ['-version'], { encoding: 'utf8', timeout: 30_000 });
+  if (version.status !== 0) {
+    throw new Error(`"${bin}" did not run after extraction (exit ${version.status})`);
+  }
+  const label = (version.stdout || version.stderr || '').split('\n')[0] ?? '';
+  const expectedLabel = isFfmpeg ? 'ffmpeg version' : 'ffprobe version';
+  if (!label.includes(expectedLabel)) {
+    throw new Error(
+      `"${bin}" is not the expected ${isFfmpeg ? 'FFmpeg' : 'FFprobe'} binary (got: ${label})`,
+    );
+  }
+
+  if (isFfmpeg) {
+    const conf = spawnSync(bin, ['-buildconf'], { encoding: 'utf8', timeout: 30_000 });
+    const text = conf.stdout || conf.stderr || '';
+    const hasGpl = text.includes('--enable-gpl');
+    const isStatic = text.includes('--enable-static') || !text.includes('--enable-shared');
+    if (!hasGpl || !isStatic) {
+      throw new Error(
+        `"${bin}" is not a static GPL build (missing --enable-gpl/--enable-static in buildconf)`,
+      );
+    }
+    console.log(`  ok  ${label} (GPL, static)`);
+  } else {
+    console.log(`  ok  ${label}`);
+  }
+}
+
 function findBinary(dir, match) {
   const stack = [dir];
   while (stack.length) {
@@ -97,10 +155,11 @@ function stripQuarantine(file) {
   spawnSync('xattr', ['-dr', 'com.apple.quarantine', file], { stdio: 'ignore' });
 }
 
-async function installEntry(key, entry) {
+async function installEntry(key, entry, targetPlatform) {
   const dir = path.join(RESOURCES_DIR, key);
   mkdirSync(dir, { recursive: true });
   const dest = path.join(dir, entry.match);
+  const isRolling = entry.rolling === true;
 
   if (existsSync(dest) && !hasFlag('--force')) {
     console.log(`  ok  ${path.relative(PROJ_ROOT, dest)} (already present)`);
@@ -118,20 +177,38 @@ async function installEntry(key, entry) {
     rmSync(workDir, { recursive: true, force: true });
     mkdirSync(workDir, { recursive: true });
 
-    if (!existsSync(archiveStamp) || hasFlag('--force')) {
+    if (isRolling && entry.sha256) {
+      throw new Error(`${key}/${entry.match}: rolling entries must not pin a sha256`);
+    }
+
+    const expectedSha256 = isRolling
+      ? await publishedChecksumFor(entry.url)
+      : entry.sha256;
+    if (!expectedSha256) {
+      throw new Error(
+        isRolling
+          ? `No published checksum found for ${archiveName}`
+          : `Missing pinned sha256 for ${key}/${entry.match}`,
+      );
+    }
+
+    let digest = '';
+    if (existsSync(archiveTmp)) digest = sha256Of(archiveTmp);
+    if (digest !== expectedSha256 || hasFlag('--force')) {
       console.log(`  dl  ${entry.url}`);
       await download(entry.url, archiveTmp);
-      const digest = sha256Of(archiveTmp);
-      if (digest !== entry.sha256) {
-        rmSync(archiveTmp, { force: true });
-        throw new Error(
-          `sha256 mismatch for ${entry.url}\n  expected ${entry.sha256}\n  received   ${digest}`,
-        );
-      }
-      writeFileSync(archiveStamp, digest, 'utf8');
+      digest = sha256Of(archiveTmp);
     } else {
-      console.log('  ok  cached archive (checksum verified earlier)');
+      console.log('  ok  cached archive (matches the published checksum)');
     }
+
+    if (digest !== expectedSha256) {
+      rmSync(archiveTmp, { force: true });
+      throw new Error(
+        `sha256 mismatch for ${entry.url}\n  expected ${expectedSha256}\n  received   ${digest}`,
+      );
+    }
+    writeFileSync(archiveStamp, digest, 'utf8');
 
     extractArchive(archiveTmp, workDir);
     const binary = findBinary(workDir, entry.match);
@@ -141,6 +218,9 @@ async function installEntry(key, entry) {
     cpSync(binary, dest);
     if (process.platform !== 'win32') spawnSync('chmod', ['+x', dest], { stdio: 'ignore' });
     stripQuarantine(dest);
+    if (isRolling && process.platform === targetPlatform) {
+      assertNativeBuild(dest, entry.match);
+    }
     console.log(`  ok  ${path.relative(PROJ_ROOT, dest)}`);
     return { dest, downloaded: true };
   } catch (err) {
@@ -160,11 +240,16 @@ async function main() {
     console.error(`Unknown target "${target}". Use one of: ${KNOWN_TARGETS.join(', ')}`);
     process.exit(1);
   }
+  const spec = sources[target];
+  if (!spec) {
+    console.error(`No entry in sources.json for target "${target}"`);
+    process.exit(1);
+  }
 
   console.log(`Preparing FFmpeg for ${target}`);
   const results = [];
-  for (const entry of sources[target].files) {
-    results.push(await installEntry(target, entry));
+  for (const entry of spec.files) {
+    results.push(await installEntry(target, entry, spec.platform));
   }
   const newCount = results.filter((r) => r.downloaded).length;
   console.log(

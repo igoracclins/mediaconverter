@@ -4,20 +4,27 @@ executable. The binaries are licensed under the GNU GPL version 2 or later
 encoder libraries such as libx264 and libx265).
 
 To fulfil the source-availability obligation of the GPL for these binaries,
-their exact provenance is recorded below. The verification hashes are logged
-in scripts/ffmpeg/sources.json; at install time `pnpm ffmpeg:prepare`
-sha256-verifies each downloaded **archive** against these hashes and refuses to
-install on mismatch, so the extracted `ffmpeg`/`ffprobe` executables are shipped
-unmodified.
+their exact provenance is recorded below. At install time `pnpm ffmpeg:prepare`
+sha256-verifies each downloaded **archive** before extraction, so the `ffmpeg`/
+`ffprobe` executables that get shipped are unmodified:
+
+  * macOS (pinned builds) — verified against the immutable hashes recorded in
+    `scripts/ffmpeg/sources.json`.
+  * Windows and Linux (rolling builds) — verified against the sha256 the
+    publisher (BtbN) publishes for the exact artifact in the `latest` release
+    (`checksums.sha256`), fetched over HTTPS from the same release; the local
+    cache keeps a `.sha256` stamp per downloaded archive. When prepared
+    natively, the extracted binaries are additionally asserted to be a static
+    GPL build.
 
 Corresponding source:
 
   * Upstream FFmpeg source (release matching each binary):
       macOS arm64  - FFmpeg 9.0   https://ffmpeg.org/releases/ffmpeg-9.0.tar.xz
       macOS x64    - FFmpeg 8.0   https://ffmpeg.org/releases/ffmpeg-8.0.tar.xz
-      Windows x64  - BtbN autobuild ffmpeg-N-126335-gb32f8d1c23
+      Windows x64  - FFmpeg master (BtbN `latest` rolling build)
                      https://github.com/BtbN/FFmpeg-Builds
-      Linux x64    - BtbN autobuild ffmpeg-N-126335-gb32f8d1c23
+      Linux x64    - FFmpeg master (BtbN `latest` rolling build)
                      https://github.com/BtbN/FFmpeg-Builds
   * Build recipes / third-party encoder sources are published by the binary
     providers: https://www.osxexperts.net (macOS) and
@@ -31,12 +38,15 @@ Binary provenance and hashes:
   * darwin-x64    ffmpeg/ffprobe 8.0
       https://www.osxexperts.net/ffmpeg80intel.zip  sha256 2d24d22db78c87f394a5822867acd5c5dc5e762cd261a44bd26923f3a5af3e07
       https://www.osxexperts.net/ffprobe80intel.zip sha256 0b6576104a95c1b39d4939e2df86f8f7cf1d55287ff57da48777d94605d12feb
-  * win32-x64     ffmpeg/ffmpeg.exe + ffprobe.exe (GPL build)
-      https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-N-126335-gb32f8d1c23-win64-gpl.zip
-      sha256 ed59cb91788b6893bf78ac8a732cc2c1367f8e17ebcbdef61c72e4865cc3df2b
-  * linux-x64     ffmpeg/ffprobe (GPL build)
-      https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-30-13-12/ffmpeg-N-126335-gb32f8d1c23-linux64-gpl.tar.xz
-      sha256 fb34e514f57696521ec6858df4fed7a6cf88cb212fd98d23a4d7b6e76340ace0
+  * win32-x64     ffmpeg.exe + ffprobe.exe (static GPL build, rolling)
+      https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip
+      sha256: the value published for this artifact in the same release's
+      `checksums.sha256` at download time (a dated autobuild would expire, so
+      the per-build hash is not pinned in this file).
+  * linux-x64     ffmpeg/ffprobe (static GPL build, rolling)
+      https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+      sha256: the value published for this artifact in the same release's
+      `checksums.sha256` at download time (see above).
 
 The exact configure line used by each binary can be inspected with
 `ffmpeg -buildconf` on the shipped executable.
