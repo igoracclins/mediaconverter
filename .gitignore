@@ -24,3 +24,12 @@ Thumbs.db
 
 # Release artifacts (if built locally instead of via CI)
 release/
+
+# Signing credentials — never commit certificates, keys or bundle secrets.
+# Provide them via environment variables / CI secrets instead.
+*.p12
+*.pfx
+*.pem
+*.key
+*.p8
+certs/

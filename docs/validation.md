@@ -37,17 +37,19 @@ the packaged app on that platform.
 
 ## Known limitations
 
-1. **No code signing (policy)**: macOS builds are unsigned by design (academic /
-   open-source project, no certificates). Gatekeeper rejects downloaded
-   (quarantined) builds with the *"…is damaged…"* dialog; the only legitimate
-   remedy is Developer ID signing + notarization, which is intentionally out of
-   scope.
-2. **No notarization**: Apple notarization is not configured. Required for
-   smooth macOS distribution.
-3. **Hardened runtime entitlements**: `allow-jit` is granted (required by
-   Electron/V8); unused entitlements (e.g. `automation.apple-events`) have been
-   removed. No network or filesystem entitlements are declared. Inert while
-   builds are unsigned.
+1. **Code signing not exercised (credentials pending)**: macOS (Developer ID +
+   notarization) and Windows (Authenticode) signing are fully configured but
+   have **not** been validated in this environment because no real credentials
+   are available. Until credentials are provided, release builds are unsigned
+   and Gatekeeper blocks downloaded builds (the *"…is damaged…"* dialog is the
+   expected symptom, not a packaging defect).
+2. **No notarization exercised**: Apple notarization is configured but only
+   activates when Apple credentials are provided; it has not been run here.
+3. **Hardened runtime entitlements**: `allow-jit`,
+   `allow-unsigned-executable-memory` and `disable-library-validation` are
+   granted (the last needed for the `sharp` native addon); unused entitlements
+   (e.g. `automation.apple-events`) have been removed. No network or filesystem
+   entitlements are declared. Inert while builds are unsigned.
 4. **FFmpeg binaries not tested on other platforms**: the Linux and Windows
    binaries have never been exercised on actual hardware. Format support and
    codec availability may differ (see `ffmpeg -buildconf`).

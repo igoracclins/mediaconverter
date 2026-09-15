@@ -109,14 +109,15 @@ pnpm dist       # artefatos para as plataformas configuradas
 
 Os artefatos são gravados na pasta `dist/`, que é gerada durante o build e não faz parte do código-fonte versionado.
 
-> **Builds sem assinatura.** Os instaladores são gerados **sem assinatura de código**
-> (política do projeto: sem certificados, notarização ou serviços externos).
-> Por isso é esperado que o macOS bloqueie um build baixado pelo Gatekeeper
-> (mensagem *"o aplicativo está danificado e não pode ser aberto"* ou *"não foi
-> possível verificar"*) e que o Windows SmartScreen mostre *"editor desconhecido"*.
-> Isso é o comportamento normal do sistema para software não assinado, não um defeito
-> do pacote. A correção legítima (assinatura Developer ID + notarização / certificado
-> Authenticode) está fora do escopo deste projeto.
+> **Assinatura de código (produção).** Os instaladores são gerados **sem assinatura**
+> a menos que credenciais reais sejam fornecidas via variáveis de ambiente/CI — o
+> projeto não guarda nem exige certificados. Quando as credenciais estiverem
+> presentes, o build produz: macOS assinado (Developer ID) + notarizado + stapled;
+> Windows assinado com Authenticode. Sem elas, o macOS pode bloquear um build
+> baixado pelo Gatekeeper (mensagem *"o aplicativo está danificado"* ou *"não foi
+> possível verificar"*) e o SmartScreen pode mostrar *"editor desconhecido"* —
+> comportamento esperado do sistema para software não assinado. Detalhes em
+> [`docs/packaging.md`](docs/packaging.md#code-signing--notarization-production).
 
 ## Estrutura do projeto
 
