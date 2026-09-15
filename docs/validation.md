@@ -37,12 +37,17 @@ the packaged app on that platform.
 
 ## Known limitations
 
-1. **No code signing**: macOS builds are unsigned. Gatekeeper blocks launch
-   until the user bypasses it. Distribution requires a Developer ID certificate.
+1. **No code signing (policy)**: macOS builds are unsigned by design (academic /
+   open-source project, no certificates). Gatekeeper rejects downloaded
+   (quarantined) builds with the *"…is damaged…"* dialog; the only legitimate
+   remedy is Developer ID signing + notarization, which is intentionally out of
+   scope.
 2. **No notarization**: Apple notarization is not configured. Required for
    smooth macOS distribution.
-3. **Hardened runtime entitlements**: `allow-jit` and `automation.apple-events`
-   are granted; no network or filesystem entitlements are declared.
+3. **Hardened runtime entitlements**: `allow-jit` is granted (required by
+   Electron/V8); unused entitlements (e.g. `automation.apple-events`) have been
+   removed. No network or filesystem entitlements are declared. Inert while
+   builds are unsigned.
 4. **FFmpeg binaries not tested on other platforms**: the Linux and Windows
    binaries have never been exercised on actual hardware. Format support and
    codec availability may differ (see `ffmpeg -buildconf`).

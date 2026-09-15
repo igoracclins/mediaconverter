@@ -63,19 +63,41 @@ The app uses `asar: true` (default). sharp's native `.node` addon cannot be
 loaded from inside the asar archive, so `asarUnpack` extracts
 `node_modules/sharp/**` into an asar.unpacked directory alongside it.
 
-## macOS code signing
+## Distribution policy: no code signing
 
-- **Hardened runtime** is enabled (`hardenedRuntime: true`).
-- `build/entitlements.mac.plist` grants two entitlements:
-  - `com.apple.security.cs.allow-jit` — required by Electron/V8.
-  - `com.apple.security.automation.apple-events` — used by the app if needed
-    for external automation.
-- **No Developer ID certificate** is configured. When run on an unsigned build
-  on macOS 12+, Gatekeeper blocks the launch unless the user right-click → Open
-  or removes the quarantine attribute. In production, signing + notarization
-  with an Apple Developer ID are required before distribution.
-- `ffmpeg -version` on macOS shows no quarantine attributes after prepare strips
-  them with `xattr -dr com.apple.quarantine`.
+Media Converter is an academic, open-source project and is distributed
+**without code signing** on every platform. This is an explicit policy, not an
+accident:
+
+- `mac.identity: null` makes electron-builder always skip signing, even if a
+  certificate happens to exist in the machine's keychain.
+- `mac.notarize: false` disables Apple notarization.
+- No certificate, Apple Developer account or external signing service is
+  required to build or run the app.
+
+Because the builds are unsigned, the operating systems apply their standard
+behavior for unsigned software:
+
+- **macOS** — an app that was downloaded (and therefore carries the quarantine
+  flag) is rejected by Gatekeeper. macOS may present this as *"…is damaged and
+  can't be opened"* or *"Apple cannot check it for malicious software"*. This is
+  the expected macOS behavior for any unsigned application and is **not** caused
+  by a corrupted or mis-packaged bundle. The only legitimate remedy is a
+  Developer ID Application certificate plus Apple notarization, which is
+  intentionally out of scope.
+- **Windows** — SmartScreen shows an *"Unknown publisher"* warning for the
+  unsigned installer. This is expected Windows behavior; it is not bypassed,
+  disabled or documented as a step the user must accept. Reputation is only
+  built over time by consistently distributing signed artifacts.
+
+## macOS code signing (prepared, not active)
+
+`hardenedRuntime: true` and `build/entitlements.mac.plist` are kept in place so
+the bundle is ready for signing if the owner ever adopts a certificate. They
+have **no effect while the build is unsigned**:
+
+- `build/entitlements.mac.plist` grants only `com.apple.security.cs.allow-jit`
+  (required by Electron/V8 for JIT on arm64). No other entitlement is declared.
 
 ## Linux specifics
 
@@ -114,10 +136,12 @@ and none should be invented without the project owner's decisions:
   `com.example.mediaconverter`. A real, owned reverse-DNS identifier is needed
   before public release (drives macOS bundle id, Windows app identity, code
   signing). Do not fabricate a domain/company.
-- **macOS code signing + notarization** — no Developer ID certificate is
-  configured. Unsigned builds are Gatekeeper-blocked until signed and
-  notarized by the owner.
-- **Windows signing** — no certificate; SmartScreen will warn on an unsigned
+- **macOS code signing + notarization** — intentionally **not** configured by
+  policy (see "Distribution policy: no code signing" above). Unsigned builds are
+  Gatekeeper-blocked when downloaded; the *"app is damaged"* dialog is the
+  expected symptom, not a packaging defect.
+- **Windows signing** — intentionally **not** configured by policy (no
+  certificate). SmartScreen will show "unknown publisher" on the unsigned
   installer.
 - **CI** — no pipeline is configured; release builds are produced manually.
 - **Definitive icon** — the official app icon is configured in `build/`
